@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import WebhookConfig from "@/components/WebhookConfig";
 import { 
   Play, 
   Pause, 
@@ -14,7 +16,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  PlayCircle
+  PlayCircle,
+  Settings
 } from "lucide-react";
 
 const mockWorkflows = [
@@ -97,6 +100,17 @@ export default function Workflows() {
           Crear Workflow
         </Button>
       </div>
+
+      <Tabs defaultValue="workflows" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="workflows">Workflows</TabsTrigger>
+          <TabsTrigger value="webhooks" className="flex items-center space-x-2">
+            <Settings className="h-4 w-4" />
+            <span>Configuración Webhooks</span>
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="workflows" className="mt-6">
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Workflows List */}
@@ -273,6 +287,12 @@ export default function Workflows() {
           </Card>
         </div>
       </div>
+        </TabsContent>
+        
+        <TabsContent value="webhooks" className="mt-6">
+          <WebhookConfig />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
