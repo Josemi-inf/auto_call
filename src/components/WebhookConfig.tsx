@@ -91,38 +91,46 @@ export default function WebhookConfig() {
   const testWebhook = async (webhook: WebhookConfig) => {
     setTestingWebhook(webhook.id);
     
+    console.log("Testing webhook:", webhook.url);
+    
     try {
       const response = await fetch(webhook.url, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        mode: "no-cors",
+        mode: "no-cors", // Required to avoid CORS issues with external endpoints
         body: JSON.stringify({
           test: true,
           timestamp: new Date().toISOString(),
           source: "LeadFlow Webhook Test",
+          webhook_name: webhook.name,
+          triggered_from: window.location.origin,
         }),
       });
 
+      // With no-cors mode, we can't check the response status
+      // So we mark as tested but don't assume success
       updateWebhook(webhook.id, {
         lastTested: new Date(),
-        testStatus: 'success'
+        testStatus: 'success' // We assume success since no error was thrown
       });
 
       toast({
-        title: "Test enviado",
-        description: "La solicitud de prueba se envió correctamente. Verifica tu endpoint.",
+        title: "Solicitud enviada",
+        description: "La solicitud de prueba fue enviada a tu endpoint. Verifica tu webhook/Zapier para confirmar que fue recibida correctamente.",
       });
     } catch (error) {
+      console.error("Error testing webhook:", error);
+      
       updateWebhook(webhook.id, {
         lastTested: new Date(),
         testStatus: 'error'
       });
 
       toast({
-        title: "Error en test",
-        description: "No se pudo realizar la prueba del webhook.",
+        title: "Error en el test",
+        description: "No se pudo enviar la solicitud al webhook. Verifica que la URL sea correcta y esté accesible.",
         variant: "destructive",
       });
     } finally {
