@@ -52,6 +52,8 @@ export default function WebhookConfig() {
   // Save webhooks to localStorage whenever webhooks change
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(webhooks));
+    // Dispatch custom event to notify other components
+    window.dispatchEvent(new CustomEvent('webhookConfigUpdate'));
   }, [webhooks]);
 
   const addWebhook = (webhookData: Omit<WebhookConfig, 'id'>) => {

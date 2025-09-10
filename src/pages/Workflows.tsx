@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,56 +17,21 @@ import {
   CheckCircle,
   AlertCircle,
   PlayCircle,
-  Settings
+  Settings,
+  Globe
 } from "lucide-react";
 
-const mockWorkflows = [
-  {
-    id: 1,
-    name: "Seguimiento Automático Toyota",
-    description: "Workflow para seguimiento automático de leads interesados en vehículos Toyota",
-    status: "active",
-    leadsCount: 45,
-    successRate: 78,
-    lastExecution: "2024-01-15T14:30:00Z",
-    steps: [
-      { id: 1, name: "Captura de Lead", type: "trigger", status: "completed" },
-      { id: 2, name: "Envío WhatsApp Inicial", type: "action", status: "completed" },
-      { id: 3, name: "Esperar 2 horas", type: "delay", status: "active" },
-      { id: 4, name: "Llamada Automática", type: "action", status: "pending" },
-      { id: 5, name: "Envío Email Oferta", type: "action", status: "pending" }
-    ]
-  },
-  {
-    id: 2,
-    name: "Recuperación de Leads Fríos",
-    description: "Reactivación de leads que no han respondido en 7 días",
-    status: "paused",
-    leadsCount: 23,
-    successRate: 45,
-    lastExecution: "2024-01-14T09:15:00Z",
-    steps: [
-      { id: 1, name: "Filtrar Leads Inactivos", type: "trigger", status: "completed" },
-      { id: 2, name: "Envío SMS Promocional", type: "action", status: "error" },
-      { id: 3, name: "Llamada de Seguimiento", type: "action", status: "pending" }
-    ]
-  },
-  {
-    id: 3,
-    name: "Onboarding Nuevos Leads BMW",
-    description: "Proceso de bienvenida para leads de BMW con información personalizada",
-    status: "active",
-    leadsCount: 12,
-    successRate: 89,
-    lastExecution: "2024-01-15T16:45:00Z",
-    steps: [
-      { id: 1, name: "Lead BMW Detectado", type: "trigger", status: "completed" },
-      { id: 2, name: "Envío Catálogo Digital", type: "action", status: "completed" },
-      { id: 3, name: "Agendar Test Drive", type: "action", status: "active" },
-      { id: 4, name: "Seguimiento Post-Visita", type: "action", status: "pending" }
-    ]
-  }
-];
+interface WebhookConfig {
+  id: string;
+  name: string;
+  url: string;
+  description?: string;
+  isActive: boolean;
+  lastTested?: Date;
+  testStatus?: 'success' | 'error' | 'pending';
+}
+
+const STORAGE_KEY = 'leadflow_webhook_configs';
 
 const statusColors = {
   active: "bg-success text-success-foreground",
@@ -83,7 +48,56 @@ const stepStatusColors = {
 };
 
 export default function Workflows() {
-  const [selectedWorkflow, setSelectedWorkflow] = useState(mockWorkflows[0]);
+  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  const [selectedWebhook, setSelectedWebhook] = useState<WebhookConfig | null>(null);
+
+  // Load webhooks from localStorage
+  useEffect(() => {
+    const savedWebhooks = localStorage.getItem(STORAGE_KEY);
+    if (savedWebhooks) {
+      try {
+        const parsed = JSON.parse(savedWebhooks);
+        setWebhooks(parsed);
+        if (parsed.length > 0) {
+          setSelectedWebhook(parsed[0]);
+        }
+      } catch (error) {
+        console.error('Error loading webhook configs:', error);
+      }
+    }
+  }, []);
+
+  // Listen for changes in localStorage (when webhooks are updated in the config tab)
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const savedWebhooks = localStorage.getItem(STORAGE_KEY);
+      if (savedWebhooks) {
+        try {
+          const parsed = JSON.parse(savedWebhooks);
+          setWebhooks(parsed);
+          if (parsed.length > 0 && !selectedWebhook) {
+            setSelectedWebhook(parsed[0]);
+          }
+        } catch (error) {
+          console.error('Error loading webhook configs:', error);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also listen for custom events when webhooks are updated in the same tab
+    const handleWebhookUpdate = () => {
+      handleStorageChange();
+    };
+    
+    window.addEventListener('webhookConfigUpdate', handleWebhookUpdate);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('webhookConfigUpdate', handleWebhookUpdate);
+    };
+  }, [selectedWebhook]);
 
   return (
     <div className="p-8">
@@ -113,178 +127,226 @@ export default function Workflows() {
         <TabsContent value="workflows" className="mt-6">
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Workflows List */}
+        {/* Webhooks List */}
         <div className="lg:col-span-1 space-y-4">
-          <h2 className="text-lg font-semibold text-foreground">Workflows Activos</h2>
-          {mockWorkflows.map((workflow) => (
-            <Card 
-              key={workflow.id} 
-              className={`p-4 cursor-pointer border transition-smooth hover:shadow-custom-md ${
-                selectedWorkflow.id === workflow.id 
-                  ? "border-primary shadow-custom-md bg-primary/5" 
-                  : "border-border"
-              }`}
-              onClick={() => setSelectedWorkflow(workflow)}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-card-foreground text-sm">
-                    {workflow.name}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                    {workflow.description}
-                  </p>
-                </div>
-                <Badge className={`text-xs ml-2 ${statusColors[workflow.status as keyof typeof statusColors]}`}>
-                  {workflow.status}
-                </Badge>
-              </div>
-              
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span className="flex items-center space-x-1">
-                  <Users className="h-3 w-3" />
-                  <span>{workflow.leadsCount} leads</span>
-                </span>
-                <span className="flex items-center space-x-1">
-                  <CheckCircle className="h-3 w-3" />
-                  <span>{workflow.successRate}%</span>
-                </span>
-              </div>
+          <h2 className="text-lg font-semibold text-foreground">Webhooks Configurados</h2>
+          {webhooks.length === 0 ? (
+            <Card className="p-6 text-center border-dashed border-2 border-muted">
+              <Globe className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-3">
+                No hay webhooks configurados
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Ve a la pestaña "Configuración Webhooks" para agregar tu primer webhook
+              </p>
             </Card>
-          ))}
+          ) : (
+            webhooks.map((webhook) => (
+              <Card 
+                key={webhook.id} 
+                className={`p-4 cursor-pointer border transition-smooth hover:shadow-custom-md ${
+                  selectedWebhook?.id === webhook.id 
+                    ? "border-primary shadow-custom-md bg-primary/5" 
+                    : "border-border"
+                }`}
+                onClick={() => setSelectedWebhook(webhook)}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-card-foreground text-sm">
+                      {webhook.name}
+                    </h3>
+                    <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                      {webhook.description || "Sin descripción"}
+                    </p>
+                  </div>
+                  <Badge className={`text-xs ml-2 ${webhook.isActive ? statusColors.active : statusColors.paused}`}>
+                    {webhook.isActive ? "Activo" : "Inactivo"}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span className="flex items-center space-x-1">
+                    <Globe className="h-3 w-3" />
+                    <span className="truncate max-w-[100px]">{new URL(webhook.url).hostname}</span>
+                  </span>
+                  {webhook.testStatus && (
+                    <span className="flex items-center space-x-1">
+                      <CheckCircle className={`h-3 w-3 ${webhook.testStatus === 'success' ? 'text-success' : 'text-error'}`} />
+                      <span>{webhook.testStatus === 'success' ? 'OK' : 'Error'}</span>
+                    </span>
+                  )}
+                </div>
+              </Card>
+            ))
+          )}
         </div>
 
-        {/* Workflow Details */}
+        {/* Webhook Details */}
         <div className="lg:col-span-2">
-          <Card className="p-6 border border-border shadow-custom-sm">
-            {/* Workflow Header */}
-            <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
-              <div className="flex items-center space-x-4">
-                <div className="p-3 rounded-lg bg-gradient-primary">
-                  <GitBranch className="h-6 w-6 text-primary-foreground" />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-card-foreground">
-                    {selectedWorkflow.name}
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedWorkflow.description}
-                  </p>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                {selectedWorkflow.status === "active" ? (
-                  <Button variant="outline" size="sm">
-                    <Pause className="h-4 w-4 mr-2" />
-                    Pausar
-                  </Button>
-                ) : (
-                  <Button variant="outline" size="sm">
-                    <Play className="h-4 w-4 mr-2" />
-                    Activar
-                  </Button>
-                )}
-                <Button variant="outline" size="sm">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Editar
-                </Button>
-              </div>
-            </div>
-
-            {/* Workflow Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="text-center p-4 rounded-lg bg-muted/30">
-                <div className="flex items-center justify-center mb-2">
-                  <Users className="h-5 w-5 text-primary" />
-                </div>
-                <p className="text-2xl font-bold text-card-foreground">
-                  {selectedWorkflow.leadsCount}
-                </p>
-                <p className="text-xs text-muted-foreground">Leads Activos</p>
-              </div>
-              
-              <div className="text-center p-4 rounded-lg bg-muted/30">
-                <div className="flex items-center justify-center mb-2">
-                  <CheckCircle className="h-5 w-5 text-success" />
-                </div>
-                <p className="text-2xl font-bold text-card-foreground">
-                  {selectedWorkflow.successRate}%
-                </p>
-                <p className="text-xs text-muted-foreground">Tasa de Éxito</p>
-              </div>
-              
-              <div className="text-center p-4 rounded-lg bg-muted/30">
-                <div className="flex items-center justify-center mb-2">
-                  <Clock className="h-5 w-5 text-warning" />
-                </div>
-                <p className="text-2xl font-bold text-card-foreground">2.5h</p>
-                <p className="text-xs text-muted-foreground">Duración Media</p>
-              </div>
-              
-              <div className="text-center p-4 rounded-lg bg-muted/30">
-                <div className="flex items-center justify-center mb-2">
-                  <PlayCircle className="h-5 w-5 text-primary" />
-                </div>
-                <p className="text-2xl font-bold text-card-foreground">24</p>
-                <p className="text-xs text-muted-foreground">Ejecuciones Hoy</p>
-              </div>
-            </div>
-
-            {/* Workflow Steps */}
-            <div>
-              <h3 className="text-lg font-semibold text-card-foreground mb-4">
-                Flujo de Trabajo
-              </h3>
-              <div className="space-y-3">
-                {selectedWorkflow.steps.map((step, index) => (
-                  <div key={step.id} className="flex items-center space-x-4 p-4 rounded-lg border border-border hover:bg-muted/20 transition-smooth">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-3 h-3 rounded-full ${stepStatusColors[step.status as keyof typeof stepStatusColors]}`} />
-                      <span className="text-sm font-medium text-muted-foreground">
-                        {index + 1}
-                      </span>
-                    </div>
-                    
-                    <div className="flex-1">
-                      <h4 className="font-medium text-card-foreground">{step.name}</h4>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge variant="outline" className="text-xs">
-                          {step.type}
-                        </Badge>
-                        <Badge 
-                          className={`text-xs ${stepStatusColors[step.status as keyof typeof stepStatusColors]} text-white`}
-                        >
-                          {step.status}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {step.status === "error" && (
-                      <AlertCircle className="h-5 w-5 text-error" />
-                    )}
+          {selectedWebhook ? (
+            <Card className="p-6 border border-border shadow-custom-sm">
+              {/* Webhook Header */}
+              <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+                <div className="flex items-center space-x-4">
+                  <div className="p-3 rounded-lg bg-gradient-primary">
+                    <Globe className="h-6 w-6 text-primary-foreground" />
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="mt-6 pt-4 border-t border-border">
-              <div className="flex items-center justify-between">
-                <p className="text-sm text-muted-foreground">
-                  Última ejecución: {new Date(selectedWorkflow.lastExecution).toLocaleString()}
-                </p>
+                  <div>
+                    <h2 className="text-xl font-bold text-card-foreground">
+                      {selectedWebhook.name}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedWebhook.description || "Webhook configurado para recibir notificaciones"}
+                    </p>
+                  </div>
+                </div>
                 <div className="flex space-x-2">
                   <Button variant="outline" size="sm">
-                    <PlayCircle className="h-4 w-4 mr-2" />
-                    Ejecutar Ahora
+                    <Edit className="h-4 w-4 mr-2" />
+                    Editar
                   </Button>
-                  <Button variant="outline" size="sm">
-                    Ver Logs
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className={selectedWebhook.isActive ? "text-warning" : "text-success"}
+                  >
+                    {selectedWebhook.isActive ? (
+                      <>
+                        <Pause className="h-4 w-4 mr-2" />
+                        Desactivar
+                      </>
+                    ) : (
+                      <>
+                        <Play className="h-4 w-4 mr-2" />
+                        Activar
+                      </>
+                    )}
                   </Button>
                 </div>
               </div>
-            </div>
-          </Card>
+
+              {/* Webhook Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-center mb-2">
+                    <CheckCircle className="h-5 w-5 text-success" />
+                  </div>
+                  <p className="text-2xl font-bold text-card-foreground">
+                    {selectedWebhook.isActive ? "Activo" : "Inactivo"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Estado</p>
+                </div>
+                
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-center mb-2">
+                    <PlayCircle className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="text-2xl font-bold text-card-foreground">
+                    {selectedWebhook.testStatus === 'success' ? 'OK' : selectedWebhook.testStatus === 'error' ? 'Error' : 'N/A'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Último Test</p>
+                </div>
+                
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-center mb-2">
+                    <Clock className="h-5 w-5 text-warning" />
+                  </div>
+                  <p className="text-2xl font-bold text-card-foreground">
+                    {selectedWebhook.lastTested 
+                      ? new Date(selectedWebhook.lastTested).toLocaleDateString()
+                      : 'Nunca'
+                    }
+                  </p>
+                  <p className="text-xs text-muted-foreground">Última Prueba</p>
+                </div>
+                
+                <div className="text-center p-4 rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-center mb-2">
+                    <Globe className="h-5 w-5 text-primary" />
+                  </div>
+                  <p className="text-xl font-bold text-card-foreground">
+                    {new URL(selectedWebhook.url).hostname}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Dominio</p>
+                </div>
+              </div>
+
+              {/* Webhook Details */}
+              <div>
+                <h3 className="text-lg font-semibold text-card-foreground mb-4">
+                  Configuración del Webhook
+                </h3>
+                <div className="space-y-4">
+                  <div className="p-4 rounded-lg border border-border hover:bg-muted/20 transition-smooth">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h4 className="font-medium text-card-foreground">URL del Endpoint</h4>
+                        <p className="text-sm text-muted-foreground mt-1 font-mono break-all">
+                          {selectedWebhook.url}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm">
+                        Copiar
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 rounded-lg border border-border">
+                    <h4 className="font-medium text-card-foreground mb-2">Estado de Conexión</h4>
+                    <div className="flex items-center space-x-2">
+                      <div className={`w-3 h-3 rounded-full ${
+                        selectedWebhook.testStatus === 'success' 
+                          ? 'bg-success' 
+                          : selectedWebhook.testStatus === 'error' 
+                          ? 'bg-error' 
+                          : 'bg-muted'
+                      }`} />
+                      <span className="text-sm text-muted-foreground">
+                        {selectedWebhook.testStatus === 'success' 
+                          ? 'Conexión exitosa' 
+                          : selectedWebhook.testStatus === 'error' 
+                          ? 'Error de conexión' 
+                          : 'Sin probar'
+                        }
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="mt-6 pt-4 border-t border-border">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {selectedWebhook.lastTested 
+                      ? `Última prueba: ${new Date(selectedWebhook.lastTested).toLocaleString()}`
+                      : 'Este webhook nunca ha sido probado'
+                    }
+                  </p>
+                  <div className="flex space-x-2">
+                    <Button variant="outline" size="sm">
+                      <PlayCircle className="h-4 w-4 mr-2" />
+                      Probar Webhook
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      Ver Historial
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <Card className="p-8 text-center border-dashed border-2 border-muted">
+              <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-card-foreground mb-2">
+                Selecciona un webhook
+              </h3>
+              <p className="text-muted-foreground">
+                Elige un webhook de la lista para ver sus detalles y configuración
+              </p>
+            </Card>
+          )}
         </div>
       </div>
         </TabsContent>
