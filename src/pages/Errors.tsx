@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,8 +19,11 @@ import {
   Database,
   Wifi
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { getErrors } from "@/services/api";
+import type { ErrorEntry } from "@/types";
 
-const mockErrors = [
+/* const mockErrors = [
   {
     id: 1,
     title: "Error de conexión API n8n",
@@ -109,7 +112,7 @@ const mockErrors = [
       { type: "details", label: "Ver logs", icon: Eye }
     ]
   }
-];
+]; */
 
 const severityColors = {
   critical: "bg-error text-error-foreground",
@@ -133,25 +136,34 @@ const typeIcons = {
 };
 
 export default function Errors() {
-  const [selectedError, setSelectedError] = useState(mockErrors[0]);
+  const [selectedError, setSelectedError] = useState<ErrorEntry | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSeverity, setFilterSeverity] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
 
-  const filteredErrors = mockErrors.filter(error => {
-    const matchesSearch = error.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         error.workflow.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesSeverity = filterSeverity === "all" || error.severity === filterSeverity;
-    const matchesStatus = filterStatus === "all" || error.status === filterStatus;
-    
-    return matchesSearch && matchesSeverity && matchesStatus;
+  const { data: errors } = useQuery({
+    queryKey: ["errors", { q: searchTerm, severity: filterSeverity, status: filterStatus }],
+    queryFn: () =>
+      getErrors({
+        q: searchTerm || undefined,
+        severity: filterSeverity !== "all" ? filterSeverity : undefined,
+        status: filterStatus !== "all" ? filterStatus : undefined,
+      }),
   });
 
+  useEffect(() => {
+    if (!selectedError && errors && errors.length > 0) {
+      setSelectedError(errors[0]);
+    }
+  }, [errors, selectedError]);
+
+  const filteredErrors = errors || [];
+
   const errorCounts = {
-    total: mockErrors.length,
-    critical: mockErrors.filter(e => e.severity === "critical").length,
-    pending: mockErrors.filter(e => e.status === "pending").length,
-    resolved: mockErrors.filter(e => e.status === "resolved").length
+    total: filteredErrors.length,
+    critical: filteredErrors.filter(e => e.severity === "critical").length,
+    pending: filteredErrors.filter(e => e.status === "pending").length,
+    resolved: filteredErrors.filter(e => e.status === "resolved").length,
   };
 
   return (
@@ -263,7 +275,7 @@ export default function Errors() {
                 <Card 
                   key={error.id}
                   className={`p-4 cursor-pointer border transition-smooth hover:shadow-custom-md ${
-                    selectedError.id === error.id 
+                    selectedError?.id === error.id 
                       ? "border-primary shadow-custom-md bg-primary/5" 
                       : "border-border"
                   }`}
@@ -302,24 +314,24 @@ export default function Errors() {
         <Card className="p-6 border border-border shadow-custom-sm">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-start space-x-3">
-              {(() => {
+              {selectedError && (() => {
                 const TypeIcon = typeIcons[selectedError.type as keyof typeof typeIcons];
                 return <TypeIcon className="h-6 w-6 text-muted-foreground mt-1" />;
               })()}
               <div>
                 <h2 className="text-lg font-bold text-card-foreground mb-1">
-                  {selectedError.title}
+                  {selectedError?.title}
                 </h2>
                 <div className="flex items-center space-x-2 mb-2">
-                  <Badge className={`text-xs ${severityColors[selectedError.severity as keyof typeof severityColors]}`}>
-                    {selectedError.severity}
+                  <Badge className={`text-xs ${selectedError ? severityColors[selectedError.severity as keyof typeof severityColors] : ''}`}>
+                    {selectedError?.severity}
                   </Badge>
-                  <Badge className={`text-xs ${statusColors[selectedError.status as keyof typeof statusColors]}`}>
-                    {selectedError.status}
+                  <Badge className={`text-xs ${selectedError ? statusColors[selectedError.status as keyof typeof statusColors] : ''}`}>
+                    {selectedError?.status}
                   </Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  {selectedError.description}
+                  {selectedError?.description}
                 </p>
               </div>
             </div>
@@ -329,21 +341,21 @@ export default function Errors() {
           <div className="grid grid-cols-2 gap-4 mb-6">
             <div>
               <label className="text-sm font-medium text-muted-foreground">Workflow Afectado</label>
-              <p className="text-sm text-card-foreground">{selectedError.workflow}</p>
+              <p className="text-sm text-card-foreground">{selectedError?.workflow}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Leads Afectados</label>
-              <p className="text-sm text-card-foreground">{selectedError.affectedLeads}</p>
+              <p className="text-sm text-card-foreground">{selectedError?.affectedLeads}</p>
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Fecha y Hora</label>
               <p className="text-sm text-card-foreground">
-                {new Date(selectedError.timestamp).toLocaleString()}
+                {selectedError ? new Date(selectedError.timestamp).toLocaleString() : ''}
               </p>
             </div>
             <div>
               <label className="text-sm font-medium text-muted-foreground">Tipo de Error</label>
-              <p className="text-sm text-card-foreground capitalize">{selectedError.type}</p>
+              <p className="text-sm text-card-foreground capitalize">{selectedError?.type}</p>
             </div>
           </div>
 
@@ -352,7 +364,7 @@ export default function Errors() {
             <h3 className="font-semibold text-card-foreground mb-3">Detalles Técnicos</h3>
             <div className="bg-muted/30 p-4 rounded-lg">
               <pre className="text-xs text-card-foreground whitespace-pre-wrap font-mono">
-                {JSON.stringify(selectedError.details, null, 2)}
+                {JSON.stringify(selectedError?.details ?? {}, null, 2)}
               </pre>
             </div>
           </div>
@@ -361,7 +373,7 @@ export default function Errors() {
           <div>
             <h3 className="font-semibold text-card-foreground mb-3">Acciones Recomendadas</h3>
             <div className="space-y-2">
-              {selectedError.actions.map((action, index) => (
+              {selectedError?.actions.map((action, index) => (
                 <Button 
                   key={index}
                   variant={index === 0 ? "default" : "outline"}

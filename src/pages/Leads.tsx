@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,12 @@ import {
   Building
 } from "lucide-react";
 
-const mockLeads = [
+import { useQuery } from "@tanstack/react-query";
+import { getLeads } from "@/services/api";
+import type { Lead } from "@/types";
+
+// Datos obtenidos desde la API (con fallback a mocks en services)
+/* const mockLeads = [
   {
     id: 1,
     name: "María González",
@@ -96,7 +101,7 @@ const mockLeads = [
       { type: "converted", date: "2024-01-13T11:20:00Z", description: "Venta cerrada" }
     ]
   }
-];
+]; */
 
 const statusColors = {
   nuevo: "bg-primary text-primary-foreground",
@@ -106,10 +111,17 @@ const statusColors = {
 };
 
 export default function Leads() {
-  const [selectedLead, setSelectedLead] = useState(mockLeads[0]);
+  const { data: leads } = useQuery({ queryKey: ["leads"], queryFn: getLeads });
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  const filteredLeads = mockLeads.filter(lead =>
+  useEffect(() => {
+    if (!selectedLead && leads && leads.length > 0) {
+      setSelectedLead(leads[0]);
+    }
+  }, [leads, selectedLead]);
+
+  const filteredLeads = (leads || []).filter(lead =>
     lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -141,7 +153,7 @@ export default function Leads() {
             <div
               key={lead.id}
               className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-smooth ${
-                selectedLead.id === lead.id ? "bg-primary/5 border-r-2 border-r-primary" : ""
+                selectedLead?.id === lead.id ? "bg-primary/5 border-r-2 border-r-primary" : ""
               }`}
               onClick={() => setSelectedLead(lead)}
             >
@@ -183,15 +195,15 @@ export default function Leads() {
                 <User className="h-6 w-6 text-primary-foreground" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-card-foreground">{selectedLead.name}</h1>
+                <h1 className="text-2xl font-bold text-card-foreground">{selectedLead?.name}</h1>
                 <div className="flex items-center space-x-4 text-sm text-muted-foreground">
                   <span className="flex items-center space-x-1">
                     <Mail className="h-4 w-4" />
-                    <span>{selectedLead.email}</span>
+                    <span>{selectedLead?.email}</span>
                   </span>
                   <span className="flex items-center space-x-1">
                     <Phone className="h-4 w-4" />
-                    <span>{selectedLead.phone}</span>
+                    <span>{selectedLead?.phone}</span>
                   </span>
                 </div>
               </div>
@@ -221,29 +233,29 @@ export default function Leads() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Estado</label>
-                    <Badge className={`mt-1 ${statusColors[selectedLead.status as keyof typeof statusColors]}`}>
-                      {selectedLead.status}
+                    <Badge className={`mt-1 ${selectedLead ? statusColors[selectedLead.status as keyof typeof statusColors] : ''}`}>
+                      {selectedLead?.status}
                     </Badge>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Último contacto</label>
                     <p className="text-sm text-card-foreground">
-                      {new Date(selectedLead.lastContact).toLocaleDateString()}
+                      {selectedLead ? new Date(selectedLead.lastContact).toLocaleDateString() : ''}
                     </p>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Concesionario</label>
-                  <p className="text-sm text-card-foreground">{selectedLead.concesionario}</p>
+                  <p className="text-sm text-card-foreground">{selectedLead?.concesionario}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Marca</label>
-                    <p className="text-sm text-card-foreground">{selectedLead.marca}</p>
+                    <p className="text-sm text-card-foreground">{selectedLead?.marca}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Modelo</label>
-                    <p className="text-sm text-card-foreground">{selectedLead.modelo}</p>
+                    <p className="text-sm text-card-foreground">{selectedLead?.modelo}</p>
                   </div>
                 </div>
               </div>
@@ -255,7 +267,7 @@ export default function Leads() {
                 Historial de Acciones
               </h3>
               <div className="space-y-3">
-                {selectedLead.actions.map((action, index) => (
+                {selectedLead?.actions.map((action, index) => (
                   <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30">
                     <div className="mt-1">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -279,7 +291,7 @@ export default function Leads() {
                 Historial de Mensajes
               </h3>
               <div className="space-y-4 max-h-60 overflow-y-auto">
-                {selectedLead.messages.map((message) => (
+                {selectedLead?.messages.map((message) => (
                   <div
                     key={message.id}
                     className={`flex ${message.sender === 'lead' ? 'justify-start' : 'justify-end'}`}

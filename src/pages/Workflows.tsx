@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -21,17 +21,9 @@ import {
   Globe
 } from "lucide-react";
 
-interface WebhookConfig {
-  id: string;
-  name: string;
-  url: string;
-  description?: string;
-  isActive: boolean;
-  lastTested?: Date;
-  testStatus?: 'success' | 'error' | 'pending';
-}
-
-const STORAGE_KEY = 'leadflow_webhook_configs';
+import { useQuery } from "@tanstack/react-query";
+import { getWorkflows } from "@/services/api";
+import type { WorkflowConfig as ApiWorkflowConfig } from "@/types";
 
 const statusColors = {
   active: "bg-success text-success-foreground",
@@ -48,56 +40,14 @@ const stepStatusColors = {
 };
 
 export default function Workflows() {
-  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
-  const [selectedWebhook, setSelectedWebhook] = useState<WebhookConfig | null>(null);
+  const { data: webhooks } = useQuery({ queryKey: ["workflows"], queryFn: getWorkflows });
+  const [selectedWebhook, setSelectedWebhook] = useState<ApiWorkflowConfig | null>(null);
 
-  // Load webhooks from localStorage
   useEffect(() => {
-    const savedWebhooks = localStorage.getItem(STORAGE_KEY);
-    if (savedWebhooks) {
-      try {
-        const parsed = JSON.parse(savedWebhooks);
-        setWebhooks(parsed);
-        if (parsed.length > 0) {
-          setSelectedWebhook(parsed[0]);
-        }
-      } catch (error) {
-        console.error('Error loading webhook configs:', error);
-      }
+    if (!selectedWebhook && webhooks && webhooks.length > 0) {
+      setSelectedWebhook(webhooks[0]);
     }
-  }, []);
-
-  // Listen for changes in localStorage (when webhooks are updated in the config tab)
-  useEffect(() => {
-    const handleStorageChange = () => {
-      const savedWebhooks = localStorage.getItem(STORAGE_KEY);
-      if (savedWebhooks) {
-        try {
-          const parsed = JSON.parse(savedWebhooks);
-          setWebhooks(parsed);
-          if (parsed.length > 0 && !selectedWebhook) {
-            setSelectedWebhook(parsed[0]);
-          }
-        } catch (error) {
-          console.error('Error loading webhook configs:', error);
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorageChange);
-    
-    // Also listen for custom events when webhooks are updated in the same tab
-    const handleWebhookUpdate = () => {
-      handleStorageChange();
-    };
-    
-    window.addEventListener('webhookConfigUpdate', handleWebhookUpdate);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-      window.removeEventListener('webhookConfigUpdate', handleWebhookUpdate);
-    };
-  }, [selectedWebhook]);
+  }, [webhooks, selectedWebhook]);
 
   return (
     <div className="p-8">
@@ -130,7 +80,7 @@ export default function Workflows() {
         {/* Webhooks List */}
         <div className="lg:col-span-1 space-y-4">
           <h2 className="text-lg font-semibold text-foreground">Webhooks Configurados</h2>
-          {webhooks.length === 0 ? (
+          {!webhooks || webhooks.length === 0 ? (
             <Card className="p-6 text-center border-dashed border-2 border-muted">
               <Globe className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
               <p className="text-sm text-muted-foreground mb-3">

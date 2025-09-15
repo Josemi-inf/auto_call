@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,6 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getWorkflows, createWorkflow, updateWorkflow as updateWorkflowApi, deleteWorkflow as deleteWorkflowApi, testWebhook as apiTestWebhook } from "@/services/api";
+import type { WorkflowConfig as ApiWorkflowConfig } from "@/types";
 import {
   Settings,
   Plus,
@@ -17,44 +20,58 @@ import {
   Check
 } from "lucide-react";
 
-interface WebhookConfig {
-  id: string;
-  name: string;
-  url: string;
-  description?: string;
-  isActive: boolean;
-  lastTested?: Date;
-  testStatus?: 'success' | 'error' | 'pending';
-}
-
-const STORAGE_KEY = 'leadflow_webhook_configs';
+type WebhookConfig = ApiWorkflowConfig;
 
 export default function WebhookConfig() {
-  const [webhooks, setWebhooks] = useState<WebhookConfig[]>([]);
+  const queryClient = useQueryClient();
+  const { data: webhooks = [] } = useQuery({ queryKey: ["workflows"], queryFn: getWorkflows });
+  // Backward-compat noop to satisfy legacy function bodies
+  const setWebhooks = (..._args: any[]) => {};
   const [editingWebhook, setEditingWebhook] = useState<WebhookConfig | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Load webhooks from localStorage on component mount
-  useEffect(() => {
-    const savedWebhooks = localStorage.getItem(STORAGE_KEY);
-    if (savedWebhooks) {
-      try {
-        const parsed = JSON.parse(savedWebhooks);
-        setWebhooks(parsed);
-      } catch (error) {
-        console.error('Error loading webhook configs:', error);
-      }
+  const createMut = useMutation({
+    mutationFn: (data: Omit<WebhookConfig, 'id'>) => createWorkflow(data),
+    onSuccess: (created) => {
+      queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => ([...(old || []), created]));
     }
-  }, []);
+  });
 
-  // Save webhooks to localStorage whenever webhooks change
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(webhooks));
-    // Dispatch custom event to notify other components
-    window.dispatchEvent(new CustomEvent('webhookConfigUpdate'));
-  }, [webhooks]);
+  const updateMut = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<WebhookConfig> }) => updateWorkflowApi(id, data),
+    onSuccess: (updated) => {
+      queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => (old || []).map(w => w.id === updated.id ? { ...w, ...updated } : w));
+    }
+  });
+
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteWorkflowApi(id),
+    onSuccess: ({ id }) => {
+      queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => (old || []).filter(w => w.id !== id));
+    }
+  });
+
+  // API-based helpers using React Query cache
+  const addWebhookApi = async (data: Omit<WebhookConfig, 'id'>) => {
+    await createMut.mutateAsync(data);
+    setShowAddForm(false);
+    toast({ title: "Webhook agregado", description: "La configuración del webhook se ha guardado exitosamente." });
+  };
+
+  const updateWebhookApiLocal = async (id: string, data: Partial<WebhookConfig>) => {
+    queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => (old || []).map(w => w.id === id ? { ...w, ...data } : w));
+    try { await updateMut.mutateAsync({ id, data }); } finally {
+      setEditingWebhook(null);
+      toast({ title: "Webhook actualizado", description: "La configuración se ha actualizado correctamente." });
+    }
+  };
+
+  const deleteWebhookApiLocal = async (id: string) => {
+    await deleteMut.mutateAsync(id);
+    toast({ title: "Webhook eliminado", description: "La configuración del webhook se ha eliminado." });
+  };
 
   const addWebhook = (webhookData: Omit<WebhookConfig, 'id'>) => {
     const newWebhook: WebhookConfig = {
@@ -88,6 +105,21 @@ export default function WebhookConfig() {
     });
   };
 
+  // Centralized webhook test using services/api
+  const runTestWebhookApi = async (webhook: WebhookConfig) => {
+    setTestingWebhook(webhook.id);
+    try {
+      const { ok } = await apiTestWebhook(webhook.url);
+      updateWebhookApiLocal(webhook.id, { lastTested: new Date(), testStatus: ok ? 'success' : 'error' });
+      toast({ title: ok ? "Solicitud enviada" : "Error en el test", variant: ok ? undefined : "destructive" });
+    } catch (e) {
+      updateWebhookApiLocal(webhook.id, { lastTested: new Date(), testStatus: 'error' });
+      toast({ title: "Error en el test", variant: "destructive" });
+    } finally {
+      setTestingWebhook(null);
+    }
+  };
+
   const testWebhook = async (webhook: WebhookConfig) => {
     setTestingWebhook(webhook.id);
     
@@ -111,7 +143,7 @@ export default function WebhookConfig() {
 
       // With no-cors mode, we can't check the response status
       // So we mark as tested but don't assume success
-      updateWebhook(webhook.id, {
+      updateWebhookApiLocal(webhook.id, {
         lastTested: new Date(),
         testStatus: 'success' // We assume success since no error was thrown
       });
@@ -123,7 +155,7 @@ export default function WebhookConfig() {
     } catch (error) {
       console.error("Error testing webhook:", error);
       
-      updateWebhook(webhook.id, {
+      updateWebhookApiLocal(webhook.id, {
         lastTested: new Date(),
         testStatus: 'error'
       });
@@ -174,11 +206,11 @@ export default function WebhookConfig() {
 
       {/* Add/Edit Form */}
       {(showAddForm || editingWebhook) && (
-        <WebhookForm
-          webhook={editingWebhook}
-          onSave={editingWebhook 
-            ? (data) => updateWebhook(editingWebhook.id, data)
-            : addWebhook
+          <WebhookForm
+            webhook={editingWebhook}
+            onSave={editingWebhook 
+            ? (data) => updateWebhookApiLocal(editingWebhook.id, data)
+            : addWebhookApi
           }
           onCancel={() => {
             setShowAddForm(false);
@@ -257,7 +289,7 @@ export default function WebhookConfig() {
                   
                   {webhook.lastTested && (
                     <p className="text-xs text-muted-foreground mt-2">
-                      Última prueba: {webhook.lastTested.toLocaleString()}
+                      Última prueba: {new Date(webhook.lastTested as any).toLocaleString()}
                     </p>
                   )}
                 </div>
@@ -266,7 +298,7 @@ export default function WebhookConfig() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => testWebhook(webhook)}
+                    onClick={() => runTestWebhookApi(webhook)}
                     disabled={testingWebhook === webhook.id}
                   >
                     <TestTube className="h-4 w-4 mr-1" />
@@ -282,7 +314,7 @@ export default function WebhookConfig() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => deleteWebhook(webhook.id)}
+                    onClick={() => deleteWebhookApiLocal(webhook.id)}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -379,3 +411,4 @@ function WebhookForm({ webhook, onSave, onCancel }: WebhookFormProps) {
     </Card>
   );
 }
+

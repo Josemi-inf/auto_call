@@ -30,44 +30,20 @@ import {
   ResponsiveContainer,
   Legend
 } from 'recharts';
-
-const callsData = [
-  { date: '2024-01-08', total: 145, successful: 89, failed: 56, duration: 2340, cost: 234.50 },
-  { date: '2024-01-09', total: 167, successful: 98, failed: 69, duration: 2890, cost: 289.20 },
-  { date: '2024-01-10', total: 134, successful: 76, failed: 58, duration: 1980, cost: 198.30 },
-  { date: '2024-01-11', total: 189, successful: 125, failed: 64, duration: 3120, cost: 312.10 },
-  { date: '2024-01-12', total: 156, successful: 94, failed: 62, duration: 2680, cost: 268.40 },
-  { date: '2024-01-13', total: 178, successful: 112, failed: 66, duration: 2950, cost: 295.80 },
-  { date: '2024-01-14', total: 165, successful: 101, failed: 64, duration: 2750, cost: 275.60 }
-];
-
-const workflowStats = [
-  { name: 'Toyota', calls: 456, successful: 342, failed: 114, percentage: 75 },
-  { name: 'Honda', calls: 287, successful: 201, failed: 86, percentage: 70 },
-  { name: 'BMW', calls: 189, successful: 156, failed: 33, percentage: 83 },
-  { name: 'Mercedes', calls: 123, successful: 89, failed: 34, percentage: 72 }
-];
-
-const pieData = [
-  { name: 'Exitosas', value: 788, color: 'hsl(var(--success))' },
-  { name: 'Fallidas', value: 267, color: 'hsl(var(--error))' },
-  { name: 'Sin respuesta', value: 145, color: 'hsl(var(--warning))' }
-];
-
-const totalStats = {
-  totalCalls: 1200,
-  successfulCalls: 788,
-  failedCalls: 267,
-  noAnswerCalls: 145,
-  totalDuration: 18420, // minutes
-  totalCost: 1842.50,
-  avgDuration: 15.35, // minutes
-  avgLatency: 2.8, // seconds
-  successRate: 65.7, // percentage
-  costPerCall: 1.54
-};
+import { useCallTimeseries, useTotalCallStats, useWorkflowStats } from "@/hooks/use-stats";
 
 export default function Statistics() {
+  const { data: timeseries } = useCallTimeseries();
+  const { data: totals } = useTotalCallStats();
+  const { data: workflows } = useWorkflowStats();
+
+  const pieData = totals
+    ? [
+        { name: 'Exitosas', value: totals.successfulCalls, color: 'hsl(var(--success))' },
+        { name: 'Fallidas', value: totals.failedCalls, color: 'hsl(var(--error))' },
+        { name: 'Sin respuesta', value: totals.noAnswerCalls, color: 'hsl(var(--warning))' }
+      ]
+    : [];
   return (
     <div className="p-8">
       {/* Header */}
@@ -96,7 +72,7 @@ export default function Statistics() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Total Llamadas</p>
-              <p className="text-3xl font-bold text-card-foreground">{totalStats.totalCalls.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-card-foreground">{totals ? totals.totalCalls.toLocaleString() : '-'}</p>
               <div className="flex items-center mt-2">
                 <TrendingUp className="h-4 w-4 text-success mr-1" />
                 <span className="text-sm text-success">+12.5%</span>
@@ -113,10 +89,10 @@ export default function Statistics() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Llamadas Exitosas</p>
-              <p className="text-3xl font-bold text-card-foreground">{totalStats.successfulCalls}</p>
+              <p className="text-3xl font-bold text-card-foreground">{totals ? totals.successfulCalls : '-'}</p>
               <div className="flex items-center mt-2">
                 <Badge className="bg-success text-success-foreground text-xs">
-                  {totalStats.successRate}%
+                  {totals ? `${totals.successRate}%` : '-'}
                 </Badge>
                 <span className="text-xs text-muted-foreground ml-2">tasa de éxito</span>
               </div>
@@ -132,10 +108,10 @@ export default function Statistics() {
             <div>
               <p className="text-sm font-medium text-muted-foreground">Duración Total</p>
               <p className="text-3xl font-bold text-card-foreground">
-                {Math.floor(totalStats.totalDuration / 60)}h {totalStats.totalDuration % 60}m
+                {totals ? `${Math.floor(totals.totalDuration / 60)}h ${totals.totalDuration % 60}m` : '-'}
               </p>
               <div className="flex items-center mt-2">
-                <span className="text-sm text-warning">{totalStats.avgDuration}m</span>
+                <span className="text-sm text-warning">{totals ? `${totals.avgDuration}m` : '-'}</span>
                 <span className="text-xs text-muted-foreground ml-1">promedio</span>
               </div>
             </div>
@@ -149,9 +125,9 @@ export default function Statistics() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-muted-foreground">Gasto Total</p>
-              <p className="text-3xl font-bold text-card-foreground">€{totalStats.totalCost.toLocaleString()}</p>
+              <p className="text-3xl font-bold text-card-foreground">{totals ? `€${totals.totalCost.toLocaleString()}` : '-'}</p>
               <div className="flex items-center mt-2">
-                <span className="text-sm text-warning">€{totalStats.costPerCall}</span>
+                <span className="text-sm text-warning">{totals ? `€${totals.costPerCall}` : '-'}</span>
                 <span className="text-xs text-muted-foreground ml-1">por llamada</span>
               </div>
             </div>
@@ -169,7 +145,7 @@ export default function Statistics() {
             Tendencia de Llamadas (7 días)
           </h3>
           <ResponsiveContainer width="100%" height={300}>
-            <AreaChart data={callsData}>
+            <AreaChart data={timeseries || []}>
               <defs>
                 <linearGradient id="totalGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="hsl(var(--stats-calls))" stopOpacity={0.3}/>
@@ -250,7 +226,7 @@ export default function Statistics() {
             Rendimiento por Workflow
           </h3>
           <div className="space-y-4">
-            {workflowStats.map((workflow) => (
+            {(workflows || []).map((workflow) => (
               <div key={workflow.name} className="p-4 rounded-lg bg-muted/30">
                 <div className="flex items-center justify-between mb-2">
                   <h4 className="font-medium text-card-foreground">{workflow.name}</h4>
@@ -292,13 +268,13 @@ export default function Statistics() {
             <div className="grid grid-cols-2 gap-4">
               <div className="text-center p-4 rounded-lg bg-muted/30">
                 <Activity className="h-8 w-8 text-stats-duration mx-auto mb-2" />
-                <p className="text-2xl font-bold text-card-foreground">{totalStats.avgLatency}s</p>
+                <p className="text-2xl font-bold text-card-foreground">{totals ? `${totals.avgLatency}s` : '-'}</p>
                 <p className="text-sm text-muted-foreground">Latencia Promedio</p>
               </div>
               
               <div className="text-center p-4 rounded-lg bg-muted/30">
                 <XCircle className="h-8 w-8 text-error mx-auto mb-2" />
-                <p className="text-2xl font-bold text-card-foreground">{totalStats.failedCalls}</p>
+                <p className="text-2xl font-bold text-card-foreground">{totals ? totals.failedCalls : '-'}</p>
                 <p className="text-sm text-muted-foreground">Llamadas Fallidas</p>
               </div>
             </div>
@@ -320,7 +296,7 @@ export default function Statistics() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Duración media:</span>
-                  <span className="font-medium text-card-foreground">{totalStats.avgDuration} min</span>
+                  <span className="font-medium text-card-foreground">{totals ? `${totals.avgDuration} min` : '-'}</span>
                 </div>
               </div>
             </div>
