@@ -12,28 +12,29 @@ import Statistics from "./pages/Statistics";
 import Errors from "./pages/Errors";
 import NotFound from "./pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 const App = () => (
-  <ErrorBoundary>
+  <BrowserRouter>
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/" element={<MainLayout><Dashboard /></MainLayout>} />
-            <Route path="/leads" element={<MainLayout><Leads /></MainLayout>} />
-            <Route path="/workflows" element={<MainLayout><Workflows /></MainLayout>} />
-            <Route path="/stats" element={<MainLayout><Statistics /></MainLayout>} />
-            <Route path="/errors" element={<MainLayout><Errors /></MainLayout>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <Routes>
+        <Route path="/" element={<MainLayout><Dashboard /></MainLayout>} />
+        <Route path="/leads" element={<MainLayout><Leads /></MainLayout>} />
+        <Route path="/workflows" element={<MainLayout><Workflows /></MainLayout>} />
+        <Route path="/stats" element={<MainLayout><Statistics /></MainLayout>} />
+        <Route path="/errors" element={<MainLayout><Errors /></MainLayout>} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </QueryClientProvider>
-  </ErrorBoundary>
+  </BrowserRouter>
 );
 
 export default App;

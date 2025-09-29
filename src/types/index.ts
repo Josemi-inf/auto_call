@@ -12,18 +12,45 @@ export interface LeadAction {
   description: string;
 }
 
-export interface Lead {
-  id: number | string;
-  name: string;
-  email: string;
-  phone: string;
-  concesionario: string;
-  marca: string;
+export interface LeadConcesionarioMarca {
+  lead_concesionario_marca_id: UUID;
+  lead_id: UUID;
+  concesionario_marca_id: UUID;
+  estado: string;
   modelo: string;
-  status: 'nuevo' | 'contactado' | 'convertido' | 'perdido' | string;
-  lastContact: string;
-  messages: LeadMessage[];
-  actions: LeadAction[];
+  fecha_entrada: string;
+  presupuesto_min: number;
+  presupuesto_max: number;
+  notas?: string;
+  comercial_id?: UUID;
+  fecha_asignacion?: string;
+  fecha_cierre?: string;
+  motivo_perdida?: string;
+  // Campos calculados/agregados
+  concesionario?: string;
+  marca?: string;
+}
+
+// Tipo para UUIDs de PostgreSQL
+type UUID = string;
+
+export interface Lead {
+  lead_id: UUID;
+  nombre: string;
+  apellidos: string;
+  email: string;
+  telefono: string;
+  telefono_e164: string;
+  estado_actual: string;
+  created_at: string;
+  last_contact_at: string;
+  source: string;
+  campana: string;
+  // Campos calculados/agregados
+  concesionario?: string;
+  marca?: string;
+  modelo?: string;
+  intentos_compra: LeadConcesionarioMarca[];
 }
 
 export interface WorkflowConfig {

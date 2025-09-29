@@ -1,74 +1,83 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, GitBranch, AlertTriangle, TrendingUp, Phone, Clock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, GitBranch, AlertTriangle, TrendingUp, Phone, Clock, Plus, Settings, BarChart3, Eye } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getDashboardStats, getRecentActivity, getWeeklyLeadsData, getWorkflowPerformance, type DashboardStats, type RecentActivity } from "@/services/dashboard-mock";
+import { useNavigate } from "react-router-dom";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
-const stats = [
-  {
-    name: "Total Leads",
-    value: "2,847",
-    change: "+12%",
-    changeType: "positive",
-    icon: Users,
-    color: "stats-calls",
-  },
-  {
-    name: "Workflows Activos",
-    value: "18",
-    change: "+2",
-    changeType: "positive",
-    icon: GitBranch,
-    color: "stats-success",
-  },
-  {
-    name: "Llamadas Hoy",
-    value: "156",
-    change: "+8%",
-    changeType: "positive",
-    icon: Phone,
-    color: "stats-duration",
-  },
-  {
-    name: "Errores Pendientes",
-    value: "3",
-    change: "-2",
-    changeType: "negative",
-    icon: AlertTriangle,
-    color: "stats-error",
-  },
-];
 
-const recentActivity = [
-  {
-    id: 1,
-    type: "lead_created",
-    message: "Nuevo lead: María González - Toyota Corolla",
-    time: "Hace 5 minutos",
-    status: "success",
-  },
-  {
-    id: 2,
-    type: "workflow_completed",
-    message: "Workflow completado para lead #2843",
-    time: "Hace 12 minutos",
-    status: "success",
-  },
-  {
-    id: 3,
-    type: "error",
-    message: "Error en workflow de llamadas automáticas",
-    time: "Hace 18 minutos",
-    status: "error",
-  },
-  {
-    id: 4,
-    type: "lead_converted",
-    message: "Lead convertido: Carlos Ruiz - Honda Civic",
-    time: "Hace 25 minutos",
-    status: "success",
-  },
-];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+
+  // Queries para obtener datos reales
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ['dashboard-stats'],
+    queryFn: getDashboardStats,
+    refetchInterval: 30000, // Actualizar cada 30 segundos
+  });
+
+  const { data: activity, isLoading: activityLoading } = useQuery({
+    queryKey: ['recent-activity'],
+    queryFn: getRecentActivity,
+    refetchInterval: 30000,
+  });
+
+  const { data: weeklyData } = useQuery({
+    queryKey: ['weekly-leads'],
+    queryFn: getWeeklyLeadsData,
+  });
+
+  const { data: workflowPerformance } = useQuery({
+    queryKey: ['workflow-performance'],
+    queryFn: getWorkflowPerformance,
+  });
+
+  // Formatear datos para las estadísticas
+  const formatStatsData = (stats: DashboardStats | undefined) => {
+    if (!stats) return [];
+
+    return [
+      {
+        name: "Total Leads",
+        value: stats.totalLeads.toLocaleString(),
+        change: `${stats.weeklyGrowth >= 0 ? '+' : ''}${stats.weeklyGrowth}%`,
+        changeType: stats.weeklyGrowth >= 0 ? "positive" : "negative",
+        icon: Users,
+        color: "stats-calls",
+      },
+      {
+        name: "Leads Activos",
+        value: stats.activeLeads.toLocaleString(),
+        change: `${stats.activeLeads} de ${stats.totalLeads}`,
+        changeType: "neutral",
+        icon: Users,
+        color: "stats-success",
+      },
+      {
+        name: "Workflows Activos",
+        value: stats.activeWorkflows.toString(),
+        change: "En ejecución",
+        changeType: "positive",
+        icon: GitBranch,
+        color: "stats-duration",
+      },
+      {
+        name: "Errores Pendientes",
+        value: stats.pendingErrors.toString(),
+        change: stats.pendingErrors > 0 ? "Requiere atención" : "Todo OK",
+        changeType: stats.pendingErrors > 0 ? "negative" : "positive",
+        icon: AlertTriangle,
+        color: "stats-error",
+      },
+    ];
+  };
+
+  const statsData = formatStatsData(stats);
+
   return (
     <div className="p-8">
       {/* Header */}
@@ -81,7 +90,22 @@ export default function Dashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        {stats.map((stat) => (
+        {statsLoading ? (
+          // Loading skeleton
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="p-6 border border-border shadow-custom-sm animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-20"></div>
+                  <div className="h-8 bg-muted rounded w-16"></div>
+                  <div className="h-4 bg-muted rounded w-24"></div>
+                </div>
+                <div className="h-12 w-12 bg-muted rounded-lg"></div>
+              </div>
+            </Card>
+          ))
+        ) : (
+          statsData.map((stat) => (
           <Card key={stat.name} className="p-6 border border-border shadow-custom-sm hover:shadow-custom-md transition-smooth">
             <div className="flex items-center justify-between">
               <div>
@@ -92,8 +116,8 @@ export default function Dashboard() {
                   {stat.value}
                 </p>
                 <div className="flex items-center mt-2">
-                  <Badge 
-                    variant={stat.changeType === "positive" ? "default" : "destructive"}
+                  <Badge
+                    variant={stat.changeType === "positive" ? "default" : stat.changeType === "negative" ? "destructive" : "secondary"}
                     className="text-xs"
                   >
                     {stat.change}
@@ -106,12 +130,13 @@ export default function Dashboard() {
               </div>
             </div>
           </Card>
-        ))}
+        ))
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
         {/* Recent Activity */}
-        <Card className="p-6 border border-border shadow-custom-sm">
+        <Card className="xl:col-span-1 p-6 border border-border shadow-custom-sm">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-card-foreground">
               Actividad Reciente
@@ -121,22 +146,118 @@ export default function Dashboard() {
               En vivo
             </Badge>
           </div>
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-smooth">
-                <div className={`mt-1 h-2 w-2 rounded-full ${
-                  activity.status === "success" ? "bg-success" : "bg-error"
-                }`} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-card-foreground font-medium">
-                    {activity.message}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.time}
-                  </p>
+          <div className="space-y-4 max-h-80 overflow-y-auto">
+            {activityLoading ? (
+              Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-start space-x-3 p-3 rounded-lg animate-pulse">
+                  <div className="mt-1 h-2 w-2 rounded-full bg-muted" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-muted rounded w-3/4"></div>
+                    <div className="h-3 bg-muted rounded w-1/2"></div>
+                  </div>
                 </div>
+              ))
+            ) : activity && activity.length > 0 ? (
+              activity.map((item) => (
+                <div key={item.id} className="flex items-start space-x-3 p-3 rounded-lg hover:bg-muted/50 transition-smooth">
+                  <div className={`mt-1 h-2 w-2 rounded-full ${
+                    item.status === "success" ? "bg-green-500" :
+                    item.status === "warning" ? "bg-yellow-500" : "bg-red-500"
+                  }`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-card-foreground font-medium">
+                      {item.message}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.time}
+                    </p>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay actividad reciente
+              </p>
+            )}
+          </div>
+        </Card>
+
+        {/* Weekly Leads Chart */}
+        <Card className="xl:col-span-2 p-6 border border-border shadow-custom-sm">
+          <h3 className="text-lg font-semibold text-card-foreground mb-4">
+            Leads de la Última Semana
+          </h3>
+          <div className="h-64">
+            {weeklyData && weeklyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={weeklyData}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis
+                    dataKey="date"
+                    tick={{ fontSize: 12 }}
+                    tickFormatter={(value) => new Date(value).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })}
+                  />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    labelFormatter={(value) => new Date(value).toLocaleDateString('es-ES', {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                    formatter={(value) => [value, 'Leads']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="leads_count"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={3}
+                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2, r: 4 }}
+                    activeDot={{ r: 6, stroke: 'hsl(var(--primary))', strokeWidth: 2 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No hay datos disponibles</p>
               </div>
-            ))}
+            )}
+          </div>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Workflow Performance */}
+        <Card className="p-6 border border-border shadow-custom-sm">
+          <h3 className="text-lg font-semibold text-card-foreground mb-4">
+            Rendimiento de Workflows
+          </h3>
+          <div className="space-y-4">
+            {workflowPerformance && workflowPerformance.length > 0 ? (
+              workflowPerformance.map((workflow, index) => (
+                <div key={index} className="p-4 rounded-lg border border-border">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="font-medium text-card-foreground">{workflow.name}</h4>
+                    <Badge variant={workflow.successRate >= 80 ? "default" : workflow.successRate >= 60 ? "secondary" : "destructive"}>
+                      {workflow.successRate}% éxito
+                    </Badge>
+                  </div>
+                  <div className="text-sm text-muted-foreground">
+                    {workflow.totalExecutions} ejecuciones • {workflow.successful} exitosas • {workflow.failed} fallidas
+                  </div>
+                  <div className="w-full bg-muted rounded-full h-2 mt-2">
+                    <div
+                      className="bg-primary h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${workflow.successRate}%` }}
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No hay datos de workflows disponibles
+              </p>
+            )}
           </div>
         </Card>
 
@@ -146,35 +267,63 @@ export default function Dashboard() {
             Acciones Rápidas
           </h3>
           <div className="space-y-3">
-            <button className="w-full p-4 text-left rounded-lg border border-border hover:bg-primary/5 hover:border-primary/20 transition-smooth group">
+            <Button
+              variant="outline"
+              className="w-full justify-start h-auto p-4 hover:bg-primary/5 hover:border-primary/20 group"
+              onClick={() => navigate('/leads')}
+            >
               <div className="flex items-center space-x-3">
-                <Users className="h-5 w-5 text-primary group-hover:text-primary-hover" />
-                <div>
-                  <p className="font-medium text-card-foreground">Ver Leads Nuevos</p>
-                  <p className="text-xs text-muted-foreground">12 leads sin procesar</p>
+                <Users className="h-5 w-5 text-primary group-hover:text-primary/80" />
+                <div className="text-left">
+                  <p className="font-medium text-card-foreground">Ver Todos los Leads</p>
+                  <p className="text-xs text-muted-foreground">{stats?.activeLeads || 0} leads activos</p>
                 </div>
               </div>
-            </button>
-            
-            <button className="w-full p-4 text-left rounded-lg border border-border hover:bg-success/5 hover:border-success/20 transition-smooth group">
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start h-auto p-4 hover:bg-green-500/5 hover:border-green-500/20 group"
+              onClick={() => navigate('/workflows')}
+            >
               <div className="flex items-center space-x-3">
-                <GitBranch className="h-5 w-5 text-success group-hover:text-success/80" />
-                <div>
-                  <p className="font-medium text-card-foreground">Crear Workflow</p>
-                  <p className="text-xs text-muted-foreground">Automatizar procesos</p>
+                <GitBranch className="h-5 w-5 text-green-600 group-hover:text-green-500" />
+                <div className="text-left">
+                  <p className="font-medium text-card-foreground">Gestionar Workflows</p>
+                  <p className="text-xs text-muted-foreground">{stats?.activeWorkflows || 0} workflows activos</p>
                 </div>
               </div>
-            </button>
-            
-            <button className="w-full p-4 text-left rounded-lg border border-border hover:bg-warning/5 hover:border-warning/20 transition-smooth group">
+            </Button>
+
+            <Button
+              variant="outline"
+              className="w-full justify-start h-auto p-4 hover:bg-blue-500/5 hover:border-blue-500/20 group"
+              onClick={() => navigate('/analytics')}
+            >
               <div className="flex items-center space-x-3">
-                <TrendingUp className="h-5 w-5 text-warning group-hover:text-warning/80" />
-                <div>
-                  <p className="font-medium text-card-foreground">Ver Estadísticas</p>
-                  <p className="text-xs text-muted-foreground">Análisis de rendimiento</p>
+                <BarChart3 className="h-5 w-5 text-blue-600 group-hover:text-blue-500" />
+                <div className="text-left">
+                  <p className="font-medium text-card-foreground">Ver Analytics</p>
+                  <p className="text-xs text-muted-foreground">Análisis completo</p>
                 </div>
               </div>
-            </button>
+            </Button>
+
+            {stats && stats.pendingErrors > 0 && (
+              <Button
+                variant="outline"
+                className="w-full justify-start h-auto p-4 hover:bg-red-500/5 hover:border-red-500/20 group"
+                onClick={() => navigate('/errors')}
+              >
+                <div className="flex items-center space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-red-600 group-hover:text-red-500" />
+                  <div className="text-left">
+                    <p className="font-medium text-card-foreground">Resolver Errores</p>
+                    <p className="text-xs text-muted-foreground">{stats.pendingErrors} errores pendientes</p>
+                  </div>
+                </div>
+              </Button>
+            )}
           </div>
         </Card>
       </div>

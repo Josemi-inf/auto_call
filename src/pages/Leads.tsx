@@ -1,4 +1,7 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { getLeads } from "@/services/api";
+import type { Lead } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,10 +18,6 @@ import {
   Car,
   Building
 } from "lucide-react";
-
-import { useQuery } from "@tanstack/react-query";
-import { getLeads } from "@/services/api";
-import type { Lead } from "@/types";
 
 // Datos obtenidos desde la API (con fallback a mocks en services)
 /* const mockLeads = [
@@ -104,10 +103,10 @@ import type { Lead } from "@/types";
 ]; */
 
 const statusColors = {
-  nuevo: "bg-primary text-primary-foreground",
-  contactado: "bg-warning text-warning-foreground",
-  convertido: "bg-success text-success-foreground",
-  perdido: "bg-error text-error-foreground"
+  "nuevo": "bg-primary text-primary-foreground",
+  "en_seguimiento": "bg-warning text-warning-foreground",
+  "convertido": "bg-success text-success-foreground",
+  "perdido": "bg-error text-error-foreground"
 };
 
 export default function Leads() {
@@ -121,10 +120,14 @@ export default function Leads() {
     }
   }, [leads, selectedLead]);
 
-  const filteredLeads = (leads || []).filter(lead =>
-    lead.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    lead.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredLeads = (leads || []).filter(lead => {
+    const searchTermLower = searchTerm.toLowerCase();
+    return (lead.nombre + " " + lead.apellidos).toLowerCase().includes(searchTermLower) ||
+           lead.email.toLowerCase().includes(searchTermLower) ||
+           lead.telefono.toLowerCase().includes(searchTermLower) ||
+           lead.concesionario?.toLowerCase().includes(searchTermLower) ||
+           lead.marca?.toLowerCase().includes(searchTermLower);
+  });
 
   return (
     <div className="flex h-screen">
@@ -151,18 +154,20 @@ export default function Leads() {
         <div className="overflow-y-auto h-full pb-20">
           {filteredLeads.map((lead) => (
             <div
-              key={lead.id}
+              key={lead.lead_id}
               className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-smooth ${
-                selectedLead?.id === lead.id ? "bg-primary/5 border-r-2 border-r-primary" : ""
+                selectedLead?.lead_id === lead.lead_id ? "bg-primary/5 border-r-2 border-r-primary" : ""
               }`}
               onClick={() => setSelectedLead(lead)}
             >
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="font-medium text-card-foreground">{lead.name}</h3>
-                    <Badge className={`text-xs ${statusColors[lead.status as keyof typeof statusColors]}`}>
-                      {lead.status}
+                    <h3 className="font-medium text-card-foreground">
+                      {lead.nombre} {lead.apellidos}
+                    </h3>
+                    <Badge className={`text-xs ${statusColors[lead.estado_actual as keyof typeof statusColors]}`}>
+                      {lead.estado_actual}
                     </Badge>
                   </div>
                   <div className="space-y-1 text-sm text-muted-foreground">
@@ -174,6 +179,18 @@ export default function Leads() {
                       <Building className="h-3 w-3" />
                       <span>{lead.concesionario}</span>
                     </div>
+                    {lead.intentos_compra[0] && (
+                      <>
+                        <div className="flex items-center space-x-2">
+                          <Car className="h-3 w-3" />
+                          <span>{lead.intentos_compra[0].marca} {lead.intentos_compra[0].modelo}</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Building className="h-3 w-3" />
+                          <span>{lead.intentos_compra[0].concesionario}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
                 <Button variant="ghost" size="icon">
@@ -187,42 +204,38 @@ export default function Leads() {
 
       {/* Lead Details */}
       <div className="flex-1 flex flex-col">
-        {/* Header */}
-        <div className="p-6 border-b border-border bg-card">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <div className="h-12 w-12 rounded-full bg-gradient-primary flex items-center justify-center">
-                <User className="h-6 w-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-card-foreground">{selectedLead?.name}</h1>
-                <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                  <span className="flex items-center space-x-1">
-                    <Mail className="h-4 w-4" />
-                    <span>{selectedLead?.email}</span>
-                  </span>
-                  <span className="flex items-center space-x-1">
-                    <Phone className="h-4 w-4" />
-                    <span>{selectedLead?.phone}</span>
-                  </span>
+        {selectedLead ? (
+          <>
+            {/* Header */}
+            <div className="p-6 border-b border-border bg-card">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                  <div className="h-12 w-12 rounded-full bg-gradient-primary flex items-center justify-center">
+                    <User className="h-6 w-6 text-primary-foreground" />
+                  </div>
+                  <div>
+                    <h1 className="text-2xl font-bold text-card-foreground">
+                      {selectedLead.nombre} {selectedLead.apellidos}
+                    </h1>
+                    <span>{selectedLead.email}</span>
+                    <span>{selectedLead.telefono}</span>
+                  </div>
+                </div>
+                <div className="flex space-x-2">
+                  <Button className="bg-gradient-primary hover:bg-primary-hover">
+                    <Phone className="h-4 w-4 mr-2" />
+                    Llamar
+                  </Button>
+                  <Button variant="outline">
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    WhatsApp
+                  </Button>
                 </div>
               </div>
             </div>
-            <div className="flex space-x-2">
-              <Button className="bg-gradient-primary hover:bg-primary-hover">
-                <Phone className="h-4 w-4 mr-2" />
-                Llamar
-              </Button>
-              <Button variant="outline">
-                <MessageSquare className="h-4 w-4 mr-2" />
-                WhatsApp
-              </Button>
-            </div>
-          </div>
-        </div>
 
-        {/* Content */}
-        <div className="flex-1 p-6 overflow-y-auto bg-background">
+            {/* Content */}
+            <div className="flex-1 p-6 overflow-y-auto bg-background">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Lead Info */}
             <Card className="p-6 border border-border shadow-custom-sm">
@@ -233,29 +246,29 @@ export default function Leads() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Estado</label>
-                    <Badge className={`mt-1 ${selectedLead ? statusColors[selectedLead.status as keyof typeof statusColors] : ''}`}>
-                      {selectedLead?.status}
+                    <Badge className={`mt-1 ${statusColors[selectedLead.estado_actual as keyof typeof statusColors]}`}>
+                      {selectedLead.estado_actual}
                     </Badge>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Último contacto</label>
                     <p className="text-sm text-card-foreground">
-                      {selectedLead ? new Date(selectedLead.lastContact).toLocaleDateString() : ''}
+                      {new Date(selectedLead.last_contact_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">Concesionario</label>
-                  <p className="text-sm text-card-foreground">{selectedLead?.concesionario}</p>
+                  <p className="text-sm text-card-foreground">{selectedLead.concesionario}</p>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Marca</label>
-                    <p className="text-sm text-card-foreground">{selectedLead?.marca}</p>
+                    <p className="text-sm text-card-foreground">{selectedLead.marca}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Modelo</label>
-                    <p className="text-sm text-card-foreground">{selectedLead?.modelo}</p>
+                    <p className="text-sm text-card-foreground">{selectedLead.modelo}</p>
                   </div>
                 </div>
               </div>
@@ -267,17 +280,23 @@ export default function Leads() {
                 Historial de Acciones
               </h3>
               <div className="space-y-3">
-                {selectedLead?.actions.map((action, index) => (
+                {selectedLead.intentos_compra.map((intento, index) => (
                   <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30">
                     <div className="mt-1">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div>
                       <p className="text-sm font-medium text-card-foreground">
-                        {action.description}
+                        Intento de compra: {intento.modelo} en {intento.concesionario}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(action.date).toLocaleString()}
+                        Estado: {intento.estado}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(intento.fecha_entrada).toLocaleString()}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Presupuesto: {intento.presupuesto_min}€ - {intento.presupuesto_max}€
                       </p>
                     </div>
                   </div>
@@ -285,38 +304,50 @@ export default function Leads() {
               </div>
             </Card>
 
-            {/* Messages History */}
+            {/* Source Info */}
             <Card className="p-6 border border-border shadow-custom-sm lg:col-span-2">
               <h3 className="text-lg font-semibold text-card-foreground mb-4">
-                Historial de Mensajes
+                Información de Origen
               </h3>
-              <div className="space-y-4 max-h-60 overflow-y-auto">
-                {selectedLead?.messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex ${message.sender === 'lead' ? 'justify-start' : 'justify-end'}`}
-                  >
-                    <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                      message.sender === 'lead'
-                        ? 'bg-muted text-card-foreground'
-                        : message.sender === 'system'
-                        ? 'bg-primary/10 text-primary border border-primary/20'
-                        : 'bg-gradient-primary text-primary-foreground'
-                    }`}>
-                      <p className="text-sm">{message.content}</p>
-                      <p className={`text-xs mt-1 ${
-                        message.sender === 'lead' ? 'text-muted-foreground' :
-                        message.sender === 'system' ? 'text-primary/70' : 'text-primary-foreground/70'
-                      }`}>
-                        {new Date(message.timestamp).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Fuente</label>
+                  <p className="text-sm text-card-foreground">{selectedLead.source}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Campaña</label>
+                  <p className="text-sm text-card-foreground">{selectedLead.campana}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Fecha de creación</label>
+                  <p className="text-sm text-card-foreground">
+                    {new Date(selectedLead.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground">Último contacto</label>
+                  <p className="text-sm text-card-foreground">
+                    {new Date(selectedLead.last_contact_at).toLocaleString()}
+                  </p>
+                </div>
               </div>
             </Card>
           </div>
-        </div>
+            </div>
+          </>
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+              <h3 className="text-lg font-medium text-card-foreground mb-2">
+                Selecciona un lead
+              </h3>
+              <p className="text-sm text-muted-foreground">
+                Elige un lead de la lista para ver sus detalles
+              </p>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

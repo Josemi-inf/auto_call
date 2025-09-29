@@ -23,6 +23,23 @@ import { useQuery } from "@tanstack/react-query";
 import { getErrors } from "@/services/api";
 import type { ErrorEntry } from "@/types";
 
+const getActionIcon = (type: string) => {
+  const iconMap = {
+    retry: RefreshCw,
+    config: Settings,
+    details: Eye,
+    edit: Settings,
+    skip: XCircle,
+    investigate: Search,
+    resolve: CheckCircle,
+    ignore: XCircle,
+    upgrade: Zap,
+    schedule: Clock,
+    resume: RefreshCw
+  };
+  return iconMap[type as keyof typeof iconMap] || Settings;
+};
+
 /* const mockErrors = [
   {
     id: 1,
@@ -41,9 +58,9 @@ import type { ErrorEntry } from "@/types";
       retryCount: 3
     },
     actions: [
-      { type: "retry", label: "Reintentar conexión", icon: RefreshCw },
-      { type: "config", label: "Revisar configuración", icon: Settings },
-      { type: "details", label: "Ver detalles completos", icon: Eye }
+      { type: "retry", label: "Reintentar conexión" },
+      { type: "config", label: "Revisar configuración" },
+      { type: "details", label: "Ver detalles completos" }
     ]
   },
   {
@@ -63,9 +80,9 @@ import type { ErrorEntry } from "@/types";
       missingFields: ["phone_number"]
     },
     actions: [
-      { type: "edit", label: "Editar lead", icon: Settings },
-      { type: "skip", label: "Omitir lead", icon: XCircle },
-      { type: "details", label: "Ver detalles", icon: Eye }
+      { type: "edit", label: "Editar lead" },
+      { type: "skip", label: "Omitir lead" },
+      { type: "details", label: "Ver detalles" }
     ]
   },
   {
@@ -85,9 +102,9 @@ import type { ErrorEntry } from "@/types";
       currentUsage: "1000/1000"
     },
     actions: [
-      { type: "upgrade", label: "Actualizar plan", icon: Zap },
-      { type: "schedule", label: "Reprogramar", icon: Clock },
-      { type: "details", label: "Ver detalles", icon: Eye }
+      { type: "upgrade", label: "Actualizar plan" },
+      { type: "schedule", label: "Reprogramar" },
+      { type: "details", label: "Ver detalles" }
     ]
   },
   {
@@ -107,9 +124,9 @@ import type { ErrorEntry } from "@/types";
       pausedAt: "2024-01-14T09:30:00Z"
     },
     actions: [
-      { type: "resume", label: "Reanudar workflow", icon: RefreshCw },
-      { type: "config", label: "Revisar configuración", icon: Settings },
-      { type: "details", label: "Ver logs", icon: Eye }
+      { type: "resume", label: "Reanudar workflow" },
+      { type: "config", label: "Revisar configuración" },
+      { type: "details", label: "Ver logs" }
     ]
   }
 ]; */
@@ -373,16 +390,19 @@ export default function Errors() {
           <div>
             <h3 className="font-semibold text-card-foreground mb-3">Acciones Recomendadas</h3>
             <div className="space-y-2">
-              {selectedError?.actions.map((action, index) => (
-                <Button 
-                  key={index}
-                  variant={index === 0 ? "default" : "outline"}
-                  className={`w-full justify-start ${index === 0 ? "bg-gradient-primary hover:bg-primary-hover" : ""}`}
-                >
-                  <action.icon className="h-4 w-4 mr-2" />
-                  {action.label}
-                </Button>
-              ))}
+              {selectedError?.actions.map((action, index) => {
+                const IconComponent = getActionIcon(action.type);
+                return (
+                  <Button
+                    key={index}
+                    variant={index === 0 ? "default" : "outline"}
+                    className={`w-full justify-start ${index === 0 ? "bg-gradient-primary hover:bg-primary-hover" : ""}`}
+                  >
+                    <IconComponent className="h-4 w-4 mr-2" />
+                    {action.label}
+                  </Button>
+                );
+              })}
             </div>
           </div>
         </Card>

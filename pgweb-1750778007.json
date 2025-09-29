@@ -1,0 +1,57 @@
+[
+ {
+  "column_name": "id",
+  "data_type": "uuid",
+  "is_nullable": "NO"
+ },
+ {
+  "column_name": "lead_id",
+  "data_type": "uuid",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "fecha_cita",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "NO"
+ },
+ {
+  "column_name": "se_realizo",
+  "data_type": "boolean",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "updated_at",
+  "data_type": "timestamp without time zone",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "observaciones",
+  "data_type": "text",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "resultado",
+  "data_type": "character varying",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "asesor_comercial",
+  "data_type": "character varying",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "tipo_cita",
+  "data_type": "character varying",
+  "is_nullable": "YES"
+ },
+ {
+  "column_name": "estado",
+  "data_type": "character varying",
+  "is_nullable": "YES"
+ }
+]

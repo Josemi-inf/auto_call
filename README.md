@@ -16,7 +16,7 @@ Queremos desarrollar una **aplicación web** para gestionar los **leads** que en
    * **Botones de acción**: "Llamar", "Escalar", "Cambiar estado", etc.
    * Un diseño limpio, con tarjetas o bloques que muestren la información de manera clara, usando una paleta neutra de colores y espacio generoso para evitar la saturación.
 
-2. **Pantalla para Gestionar Workflows (con n8n):**
+2. **Pantalla para Gestiónar Workflows (con n8n):**
 
    * Visualizar los workflows activos y su estado (ejecución, pausado, etc.).
    * Mostrar una lista de leads asociados a cada workflow.

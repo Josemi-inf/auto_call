@@ -17,16 +17,24 @@ import {
   Globe,
   Copy,
   TestTube,
-  Check
+  Check,
+  AlertCircle
 } from "lucide-react";
 
 type WebhookConfig = ApiWorkflowConfig;
 
 export default function WebhookConfig() {
   const queryClient = useQueryClient();
-  const { data: webhooks = [] } = useQuery({ queryKey: ["workflows"], queryFn: getWorkflows });
-  // Backward-compat noop to satisfy legacy function bodies
-  const setWebhooks = (..._args: any[]) => {};
+  const {
+    data: webhooks = [],
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ["workflows"],
+    queryFn: getWorkflows,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: 2
+  });
   const [editingWebhook, setEditingWebhook] = useState<WebhookConfig | null>(null);
   const [showAddForm, setShowAddForm] = useState(false);
   const [testingWebhook, setTestingWebhook] = useState<string | null>(null);
@@ -36,6 +44,10 @@ export default function WebhookConfig() {
     mutationFn: (data: Omit<WebhookConfig, 'id'>) => createWorkflow(data),
     onSuccess: (created) => {
       queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => ([...(old || []), created]));
+    },
+    onError: (error) => {
+      console.error("Create webhook error:", error);
+      toast({ title: "Error", description: "No se pudo crear el webhook.", variant: "destructive" });
     }
   });
 
@@ -43,6 +55,11 @@ export default function WebhookConfig() {
     mutationFn: ({ id, data }: { id: string; data: Partial<WebhookConfig> }) => updateWorkflowApi(id, data),
     onSuccess: (updated) => {
       queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => (old || []).map(w => w.id === updated.id ? { ...w, ...updated } : w));
+    },
+    onError: (error) => {
+      console.error("Update webhook error:", error);
+      // Refresh the data to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
     }
   });
 
@@ -50,6 +67,12 @@ export default function WebhookConfig() {
     mutationFn: (id: string) => deleteWorkflowApi(id),
     onSuccess: ({ id }) => {
       queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => (old || []).filter(w => w.id !== id));
+    },
+    onError: (error) => {
+      console.error("Delete webhook error:", error);
+      toast({ title: "Error", description: "No se pudo eliminar el webhook.", variant: "destructive" });
+      // Refresh the data to ensure consistency
+      queryClient.invalidateQueries({ queryKey: ["workflows"] });
     }
   });
 
@@ -61,111 +84,90 @@ export default function WebhookConfig() {
   };
 
   const updateWebhookApiLocal = async (id: string, data: Partial<WebhookConfig>) => {
-    queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) => (old || []).map(w => w.id === id ? { ...w, ...data } : w));
-    try { await updateMut.mutateAsync({ id, data }); } finally {
+    try {
+      await updateMut.mutateAsync({ id, data });
       setEditingWebhook(null);
       toast({ title: "Webhook actualizado", description: "La configuración se ha actualizado correctamente." });
+    } catch (error) {
+      console.error("Error updating webhook:", error);
+      toast({ title: "Error", description: "No se pudo actualizar el webhook.", variant: "destructive" });
     }
   };
 
   const deleteWebhookApiLocal = async (id: string) => {
-    await deleteMut.mutateAsync(id);
-    toast({ title: "Webhook eliminado", description: "La configuración del webhook se ha eliminado." });
-  };
-
-  const addWebhook = (webhookData: Omit<WebhookConfig, 'id'>) => {
-    const newWebhook: WebhookConfig = {
-      ...webhookData,
-      id: Date.now().toString(),
-    };
-    setWebhooks(prev => [...prev, newWebhook]);
-    setShowAddForm(false);
-    toast({
-      title: "Webhook agregado",
-      description: "La configuración del webhook se ha guardado exitosamente.",
-    });
-  };
-
-  const updateWebhook = (id: string, webhookData: Partial<WebhookConfig>) => {
-    setWebhooks(prev => prev.map(webhook => 
-      webhook.id === id ? { ...webhook, ...webhookData } : webhook
-    ));
-    setEditingWebhook(null);
-    toast({
-      title: "Webhook actualizado",
-      description: "La configuración se ha actualizado correctamente.",
-    });
-  };
-
-  const deleteWebhook = (id: string) => {
-    setWebhooks(prev => prev.filter(webhook => webhook.id !== id));
-    toast({
-      title: "Webhook eliminado",
-      description: "La configuración del webhook se ha eliminado.",
-    });
-  };
-
-  // Centralized webhook test using services/api
-  const runTestWebhookApi = async (webhook: WebhookConfig) => {
-    setTestingWebhook(webhook.id);
     try {
-      const { ok } = await apiTestWebhook(webhook.url);
-      updateWebhookApiLocal(webhook.id, { lastTested: new Date(), testStatus: ok ? 'success' : 'error' });
-      toast({ title: ok ? "Solicitud enviada" : "Error en el test", variant: ok ? undefined : "destructive" });
-    } catch (e) {
-      updateWebhookApiLocal(webhook.id, { lastTested: new Date(), testStatus: 'error' });
-      toast({ title: "Error en el test", variant: "destructive" });
-    } finally {
-      setTestingWebhook(null);
+      await deleteMut.mutateAsync(id);
+      toast({ title: "Webhook eliminado", description: "La configuración del webhook se ha eliminado." });
+    } catch (error) {
+      console.error("Error deleting webhook:", error);
+      toast({ title: "Error", description: "No se pudo eliminar el webhook.", variant: "destructive" });
     }
   };
 
+  // Centralized webhook test function
   const testWebhook = async (webhook: WebhookConfig) => {
+    if (testingWebhook) {
+      console.log("Test already in progress, skipping");
+      return; // Prevent concurrent tests
+    }
+
+    console.log("Starting webhook test for:", webhook.name, webhook.url);
     setTestingWebhook(webhook.id);
-    
-    console.log("Testing webhook:", webhook.url);
-    
+
     try {
-      const response = await fetch(webhook.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        mode: "no-cors", // Required to avoid CORS issues with external endpoints
-        body: JSON.stringify({
-          test: true,
-          timestamp: new Date().toISOString(),
-          source: "LeadFlow Webhook Test",
-          webhook_name: webhook.name,
-          triggered_from: window.location.origin,
-        }),
-      });
+      console.log("Calling apiTestWebhook...");
+      const result = await apiTestWebhook(webhook.url);
+      console.log("apiTestWebhook result:", result);
 
-      // With no-cors mode, we can't check the response status
-      // So we mark as tested but don't assume success
-      updateWebhookApiLocal(webhook.id, {
+      // Update cache optimistically
+      const updatedData = {
         lastTested: new Date(),
-        testStatus: 'success' // We assume success since no error was thrown
+        testStatus: result.ok ? 'success' as const : 'error' as const
+      };
+
+      console.log("Updating cache with:", updatedData);
+      queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) =>
+        (old || []).map(w => w.id === webhook.id ? { ...w, ...updatedData } : w)
+      );
+
+      // Persist to backend
+      try {
+        await updateMut.mutateAsync({ id: webhook.id, data: updatedData });
+        console.log("Backend update successful");
+      } catch (updateError) {
+        console.warn("Backend update failed, but continuing:", updateError);
+      }
+
+      const toastMessage = result.message || (result.ok
+        ? "Webhook probado exitosamente. La solicitud fue enviada a tu endpoint."
+        : "El webhook no respondió correctamente. Verifica la URL.");
+
+      console.log("Showing toast:", toastMessage);
+      toast({
+        title: result.ok ? "✅ Test exitoso" : "❌ Test falló",
+        description: toastMessage,
+        variant: result.ok ? undefined : "destructive",
       });
 
-      toast({
-        title: "Solicitud enviada",
-        description: "La solicitud de prueba fue enviada a tu endpoint. Verifica tu webhook/Zapier para confirmar que fue recibida correctamente.",
-      });
     } catch (error) {
-      console.error("Error testing webhook:", error);
-      
-      updateWebhookApiLocal(webhook.id, {
+      console.error("Error during webhook test:", error);
+
+      const errorData = {
         lastTested: new Date(),
-        testStatus: 'error'
-      });
+        testStatus: 'error' as const
+      };
+
+      queryClient.setQueryData<WebhookConfig[]>(["workflows"], (old) =>
+        (old || []).map(w => w.id === webhook.id ? { ...w, ...errorData } : w)
+      );
 
       toast({
-        title: "Error en el test",
-        description: "No se pudo enviar la solicitud al webhook. Verifica que la URL sea correcta y esté accesible.",
+        title: "❌ Error en el test",
+        description: `Error: ${error instanceof Error ? error.message : 'Error desconocido'}`,
         variant: "destructive",
       });
     } finally {
+      console.log("Webhook test finished, clearing testing state");
       setTestingWebhook(null);
     }
   };
@@ -177,6 +179,45 @@ export default function WebhookConfig() {
       description: "URL copiada al portapapeles.",
     });
   };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <Card className="p-6 border border-border shadow-custom-sm">
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <div className="animate-spin h-8 w-8 border-2 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Cargando webhooks...</p>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <Card className="p-6 border border-border shadow-custom-sm">
+        <div className="flex items-center justify-center py-8">
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-error mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-card-foreground mb-2">
+              Error al cargar webhooks
+            </h3>
+            <p className="text-muted-foreground mb-4">
+              No se pudieron cargar los webhooks. Verifica tu conexión.
+            </p>
+            <Button
+              onClick={() => queryClient.invalidateQueries({ queryKey: ["workflows"] })}
+              variant="outline"
+            >
+              Reintentar
+            </Button>
+          </div>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card className="p-6 border border-border shadow-custom-sm">
@@ -195,9 +236,10 @@ export default function WebhookConfig() {
             </p>
           </div>
         </div>
-        <Button 
+        <Button
           onClick={() => setShowAddForm(true)}
           className="bg-gradient-primary hover:bg-primary-hover"
+          disabled={isLoading}
         >
           <Plus className="h-4 w-4 mr-2" />
           Agregar Webhook
@@ -289,16 +331,16 @@ export default function WebhookConfig() {
                   
                   {webhook.lastTested && (
                     <p className="text-xs text-muted-foreground mt-2">
-                      Última prueba: {new Date(webhook.lastTested as any).toLocaleString()}
+                      Última prueba: {new Date(webhook.lastTested as string | number | Date).toLocaleString()}
                     </p>
                   )}
                 </div>
                 
                 <div className="flex space-x-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     size="sm"
-                    onClick={() => runTestWebhookApi(webhook)}
+                    onClick={() => testWebhook(webhook)}
                     disabled={testingWebhook === webhook.id}
                   >
                     <TestTube className="h-4 w-4 mr-1" />

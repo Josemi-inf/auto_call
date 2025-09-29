@@ -56,7 +56,7 @@ export default function Workflows() {
         <div>
           <h1 className="text-3xl font-bold text-foreground">Workflows</h1>
           <p className="text-muted-foreground mt-2">
-            Gestiona y monitoriza tus flujos de trabajo automatizados
+            Gestióna y monitoriza tus flujos de trabajo automatizados
           </p>
         </div>
         <Button className="bg-gradient-primary hover:bg-primary-hover">
@@ -195,7 +195,7 @@ export default function Workflows() {
                   <p className="text-2xl font-bold text-card-foreground">
                     {selectedWebhook.testStatus === 'success' ? 'OK' : selectedWebhook.testStatus === 'error' ? 'Error' : 'N/A'}
                   </p>
-                  <p className="text-xs text-muted-foreground">Último Test</p>
+                  <p className="text-xs text-muted-foreground">ÚÚÚltimo Test</p>
                 </div>
                 
                 <div className="text-center p-4 rounded-lg bg-muted/30">
@@ -208,7 +208,7 @@ export default function Workflows() {
                       : 'Nunca'
                     }
                   </p>
-                  <p className="text-xs text-muted-foreground">Última Prueba</p>
+                  <p className="text-xs text-muted-foreground"> ÚÚltima Prueba</p>
                 </div>
                 
                 <div className="text-center p-4 rounded-lg bg-muted/30">
@@ -270,7 +270,7 @@ export default function Workflows() {
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
                     {selectedWebhook.lastTested 
-                      ? `Última prueba: ${new Date(selectedWebhook.lastTested).toLocaleString()}`
+                      ? ` ÚÚltima prueba: ${new Date(selectedWebhook.lastTested).toLocaleString()}`
                       : 'Este webhook nunca ha sido probado'
                     }
                   </p>

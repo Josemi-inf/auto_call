@@ -7,14 +7,14 @@ import {
   WorkflowStatsEntry,
   Lead,
 } from "@/types";
+import { mockLeads } from "@/services/mock";
 import {
   mockCallsData,
   mockErrors,
-  mockLeads,
   mockTotalStats,
   mockWorkflows,
   mockWorkflowStats,
-} from "@/services/mock";
+} from "@/services/mock-extras";
 
 const delay = (ms: number) => new Promise((res) => setTimeout(res, ms));
 
@@ -103,26 +103,94 @@ export async function getErrors(params?: { type?: string; severity?: string; sta
 }
 
 // Utilities
-export async function testWebhook(url: string): Promise<{ ok: boolean }> {
+export async function testWebhook(url: string): Promise<{ ok: boolean; message?: string }> {
+  console.log(`[API] Testing webhook: ${url}`);
+  console.log(`[API] API_BASE_URL configured: ${!!API_BASE_URL}`);
+
   try {
     // If API_BASE_URL provided, prefer a backend proxy endpoint
     if (API_BASE_URL) {
+      console.log(`[API] Using backend proxy at: ${API_BASE_URL}/webhooks/test`);
       const res = await fetch(`${API_BASE_URL}/webhooks/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
-      return { ok: res.ok };
+      console.log(`[API] Backend response status: ${res.status}`);
+      return { ok: res.ok, message: res.ok ? "Test exitoso via backend" : "Error en backend" };
     }
-    // Fallback: best-effort direct call with no-cors
-    await fetch(url, {
+
+    // Direct webhook test with enhanced payload
+    console.log(`[API] Testing webhook directly`);
+
+    const testPayload = {
+      test: true,
+      source: "LeadFlow Webhook Test",
+      timestamp: new Date().toISOString(),
+      webhook_test: {
+        trigger_time: new Date().toISOString(),
+        test_id: `test_${Date.now()}`,
+        app_name: "LeadFlow",
+        version: "1.0.0"
+      },
+      sample_lead_data: {
+        lead_id: "sample_lead_123",
+        email: "test@leadflow.com",
+        name: "Test Lead",
+        phone: "+1234567890",
+        campaign: "webhook_test",
+        source: "manual_test",
+        created_at: new Date().toISOString()
+      }
+    };
+
+    console.log(`[API] Sending enhanced payload:`, testPayload);
+
+    const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      mode: "no-cors",
-      body: JSON.stringify({ test: true, source: "LeadFlow" }),
+      headers: {
+        "Content-Type": "application/json",
+        "User-Agent": "LeadFlow-WebhookTester/1.0"
+      },
+      body: JSON.stringify(testPayload),
     });
-    return { ok: true };
-  } catch {
-    return { ok: false };
+
+    const success = response.ok;
+    console.log(`[API] Direct webhook test result: ${success ? 'SUCCESS' : 'FAILED'} (Status: ${response.status})`);
+
+    return {
+      ok: success,
+      message: success
+        ? "Webhook ejecutado correctamente"
+        : `Error HTTP ${response.status}: ${response.statusText}`
+    };
+
+  } catch (error) {
+    console.error(`[API] Webhook test failed:`, error);
+
+    // If it's a CORS error, try no-cors mode as fallback
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      console.log(`[API] Trying no-cors fallback...`);
+      try {
+        await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          mode: "no-cors",
+          body: JSON.stringify({
+            test: true,
+            source: "LeadFlow (no-cors mode)",
+            timestamp: new Date().toISOString()
+          }),
+        });
+        return { ok: true, message: "Solicitud enviada (modo no-cors - verificar endpoint)" };
+      } catch (noCorsError) {
+        console.error(`[API] No-cors fallback also failed:`, noCorsError);
+      }
+    }
+
+    return {
+      ok: false,
+      message: `Error de conexión: ${error instanceof Error ? error.message : 'Error desconocido'}`
+    };
   }
 }

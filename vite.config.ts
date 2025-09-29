@@ -9,7 +9,7 @@ export default defineConfig(({ mode }) => {
   const proxyTarget = env.VITE_API_PROXY_TARGET;
   return {
     server: {
-      host: "::",
+      host: "localhost",
       port: 8080,
       proxy: proxyTarget
         ? {
