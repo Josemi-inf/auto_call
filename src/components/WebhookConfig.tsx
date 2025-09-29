@@ -106,13 +106,28 @@ export default function WebhookConfig() {
 
   // Centralized webhook test function
   const testWebhook = async (webhook: WebhookConfig) => {
+    console.log("🚀 =================================");
+    console.log("🚀 WEBHOOK TEST FUNCTION CALLED");
+    console.log("🚀 =================================");
+
     if (testingWebhook) {
-      console.log("Test already in progress, skipping");
+      console.log("❌ Test already in progress, skipping");
+      console.log("❌ Current testing webhook ID:", testingWebhook);
       return; // Prevent concurrent tests
     }
 
-    console.log("Starting webhook test for:", webhook.name, webhook.url);
+    console.log("✅ Starting webhook test for:", webhook.name);
+    console.log("✅ Webhook URL:", webhook.url);
+    console.log("✅ Webhook ID:", webhook.id);
+
+    console.log("🔄 Setting testing state to:", webhook.id);
     setTestingWebhook(webhook.id);
+
+    // Show immediate toast to confirm test started
+    toast({
+      title: "🔄 Iniciando prueba",
+      description: `Probando webhook: ${webhook.name}`,
+    });
 
     try {
       console.log("Calling apiTestWebhook...");
@@ -340,11 +355,15 @@ export default function WebhookConfig() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => testWebhook(webhook)}
+                    onClick={() => {
+                      console.log("🔥 BUTTON CLICKED - Starting webhook test");
+                      console.log("Webhook data:", webhook);
+                      testWebhook(webhook);
+                    }}
                     disabled={testingWebhook === webhook.id}
                   >
                     <TestTube className="h-4 w-4 mr-1" />
-                    {testingWebhook === webhook.id ? "Probando..." : "Probar"}
+                    {testingWebhook === webhook.id ? "🔄 Probando..." : "🚀 Probar"}
                   </Button>
                   <Button 
                     variant="outline" 
