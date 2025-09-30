@@ -33,7 +33,8 @@ async function maybeFetch<T>(path: string, init?: RequestInit, fallback?: T): Pr
 
 // Leads
 export async function getLeads(): Promise<Lead[]> {
-  return maybeFetch<Lead[]>("/leads", undefined, mockLeads);
+  const response = await maybeFetch<{ data: Lead[] }>("/leads", undefined, { data: mockLeads });
+  return response.data || response as any; // Handle both { data: [] } and [] formats
 }
 
 // Workflows (webhooks)
