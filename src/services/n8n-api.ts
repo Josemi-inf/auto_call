@@ -1,5 +1,12 @@
-import { N8N_CONFIG, WEBHOOK_URLS } from "@/services/config";
+import { N8N_CONFIG, WEBHOOK_URLS, N8N_PROJECT_ID, N8N_FOLDER_ID } from "@/services/config";
 import { mockN8nWorkflows, mockN8nExecutions, getMockWorkflowStats } from "@/services/mock-n8n";
+
+export interface N8nTag {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
 
 export interface N8nWorkflow {
   id: string;
@@ -8,7 +15,7 @@ export interface N8nWorkflow {
   createdAt: string;
   updatedAt: string;
   versionId: string;
-  tags?: string[];
+  tags?: (string | N8nTag)[];
   nodes?: N8nNode[];
   connections?: any;
   staticData?: any;
@@ -86,7 +93,12 @@ class N8nApiService {
       throw new Error("N8N_BASE_URL no está configurada");
     }
 
-    const url = `${this.baseUrl}/api/v1${endpoint}`;
+    // Use proxy in development to avoid CORS issues
+    const isDev = import.meta.env.DEV;
+    const url = isDev
+      ? `/n8n-api${endpoint}`
+      : `${this.baseUrl}/api/v1${endpoint}`;
+
     console.log(`[N8N API] ${options?.method || 'GET'} ${url}`);
 
     const response = await fetch(url, {
@@ -107,7 +119,7 @@ class N8nApiService {
   }
 
   // Get all workflows
-  async getWorkflows(): Promise<N8nWorkflow[]> {
+  async getWorkflows(folderFilter?: string): Promise<N8nWorkflow[]> {
     if (!this.baseUrl) {
       console.log("[N8N API] No baseUrl configured, using mock data");
       // Simulate API delay
@@ -116,9 +128,53 @@ class N8nApiService {
     }
 
     try {
-      return await this.request<N8nWorkflow[]>('/workflows');
+      // n8n API doesn't have a direct endpoint for project/folder filtering
+      // We need to fetch all workflows and filter by tag
+      const endpoint = '/workflows';
+
+      console.log(`[N8N API] Fetching all workflows from: ${endpoint}`);
+      console.log(`[N8N API] Will filter by tag: "autocall"`);
+
+      const response = await this.request<{ data: N8nWorkflow[] } | N8nWorkflow[]>(endpoint);
+
+      console.log("[N8N API] Raw response received");
+
+      let workflows: N8nWorkflow[] = [];
+
+      // n8n API returns { data: [...] }, extract the array
+      if (response && typeof response === 'object' && 'data' in response) {
+        workflows = response.data;
+        console.log("[N8N API] Extracted workflows from response.data");
+      } else if (Array.isArray(response)) {
+        workflows = response;
+        console.log("[N8N API] Response is already an array");
+      } else {
+        console.warn("[N8N API] Unexpected response format:", response);
+        return mockN8nWorkflows;
+      }
+
+      console.log(`[N8N API] Fetched ${workflows.length} total workflows`);
+
+      // Filter by tag "autocall"
+      const filteredWorkflows = workflows.filter(workflow => {
+        if (!workflow.tags) return false;
+        return workflow.tags.some(tag => {
+          const tagName = typeof tag === 'string' ? tag : tag.name;
+          return tagName === 'autocall';
+        });
+      });
+
+      console.log(`[N8N API] Filtered to ${filteredWorkflows.length} workflows with tag "autocall"`);
+      if (filteredWorkflows.length > 0) {
+        console.log("[N8N API] Sample filtered workflow:", filteredWorkflows[0]?.name);
+      }
+
+      return filteredWorkflows;
     } catch (error) {
-      console.warn("[N8N API] Failed to fetch from n8n API, falling back to mock data:", error);
+      console.error("[N8N API] Failed to fetch from n8n API:", error);
+      if (error instanceof Error) {
+        console.error("[N8N API] Error message:", error.message);
+      }
       // Simulate API delay
       await new Promise(resolve => setTimeout(resolve, 300));
       return mockN8nWorkflows;
@@ -146,17 +202,20 @@ class N8nApiService {
     }
 
     try {
-      return await this.request<N8nWorkflow>(`/workflows/${id}/activate`, {
+      console.log(`[N8N API] ${active ? 'Activating' : 'Deactivating'} workflow ${id}`);
+
+      // n8n API uses separate endpoints for activate and deactivate
+      const endpoint = active ? `/workflows/${id}/activate` : `/workflows/${id}/deactivate`;
+
+      const response = await this.request<N8nWorkflow>(endpoint, {
         method: 'POST',
-        body: JSON.stringify({ active }),
       });
+
+      console.log(`[N8N API] Workflow ${id} is now ${response.active ? 'active' : 'inactive'}`);
+      return response;
     } catch (error) {
-      console.warn("[N8N API] Failed to toggle workflow via API, using mock response:", error);
-      const workflow = mockN8nWorkflows.find(w => w.id === id);
-      if (!workflow) throw new Error(`Workflow ${id} not found`);
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-      return { ...workflow, active };
+      console.error(`[N8N API] Failed to ${active ? 'activate' : 'deactivate'} workflow:`, error);
+      throw error;
     }
   }
 
@@ -166,7 +225,17 @@ class N8nApiService {
       const executions = mockN8nExecutions[workflowId] || [];
       return executions.slice(0, limit);
     }
-    return this.request<N8nExecution[]>(`/executions?workflowId=${workflowId}&limit=${limit}`);
+
+    const response = await this.request<{ data: N8nExecution[] } | N8nExecution[]>(`/executions?workflowId=${workflowId}&limit=${limit}`);
+
+    // n8n API returns { data: [...] }, extract the array
+    if (response && typeof response === 'object' && 'data' in response) {
+      return response.data;
+    } else if (Array.isArray(response)) {
+      return response;
+    }
+
+    return [];
   }
 
   // Test webhook by triggering it
@@ -270,24 +339,45 @@ class N8nApiService {
     }
 
     try {
-      return await this.request<N8nExecution>(`/workflows/${id}/execute`, {
+      // Try the standard n8n API endpoint for executing workflows
+      const response = await this.request<N8nExecution>(`/workflows/${id}/run`, {
         method: 'POST',
         body: JSON.stringify(inputData || {}),
       });
+
+      console.log("[N8N API] Workflow execution started:", response);
+      return response;
     } catch (error) {
-      console.warn("[N8N API] Failed to execute workflow via API, using mock execution:", error);
-      // Simulate execution
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const execution: N8nExecution = {
-        id: `exec-${id}-${Date.now()}`,
-        workflowId: id,
-        mode: 'manual',
-        startedAt: new Date().toISOString(),
-        stoppedAt: new Date(Date.now() + 2000).toISOString(),
-        finished: true,
-        status: 'success'
-      };
-      return execution;
+      console.error("[N8N API] Failed to execute workflow via /run endpoint:", error);
+
+      // Try alternative endpoint
+      try {
+        const response = await this.request<N8nExecution>(`/executions`, {
+          method: 'POST',
+          body: JSON.stringify({
+            workflowId: id,
+            data: inputData || {}
+          }),
+        });
+
+        console.log("[N8N API] Workflow execution started via /executions:", response);
+        return response;
+      } catch (error2) {
+        console.error("[N8N API] Failed to execute workflow via /executions endpoint:", error2);
+
+        // Return mock execution as fallback
+        await new Promise(resolve => setTimeout(resolve, 800));
+        const execution: N8nExecution = {
+          id: `exec-${id}-${Date.now()}`,
+          workflowId: id,
+          mode: 'manual',
+          startedAt: new Date().toISOString(),
+          stoppedAt: new Date(Date.now() + 2000).toISOString(),
+          finished: true,
+          status: 'success'
+        };
+        return execution;
+      }
     }
   }
 

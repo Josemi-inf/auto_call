@@ -6,17 +6,25 @@ import { componentTagger } from "lovable-tagger";
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const proxyTarget = env.VITE_API_PROXY_TARGET;
+  const n8nBaseUrl = env.VITE_N8N_BASE_URL;
+
   return {
     server: {
       host: "localhost",
       port: 8080,
-      proxy: proxyTarget
+      proxy: n8nBaseUrl
         ? {
-            "/api": {
-              target: proxyTarget,
+            "/n8n-api": {
+              target: n8nBaseUrl,
               changeOrigin: true,
               secure: false,
+              rewrite: (path) => path.replace(/^\/n8n-api/, '/api/v1'),
+            },
+            "/n8n-webhook": {
+              target: n8nBaseUrl,
+              changeOrigin: true,
+              secure: false,
+              rewrite: (path) => path.replace(/^\/n8n-webhook/, ''),
             },
           }
         : undefined,

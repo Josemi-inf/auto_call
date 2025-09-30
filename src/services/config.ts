@@ -2,6 +2,10 @@ export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "";
 export const N8N_BASE_URL = (import.meta as any).env?.VITE_N8N_BASE_URL || "";
 export const N8N_API_KEY = (import.meta as any).env?.VITE_N8N_API_KEY || "";
 
+// n8n Project and Folder IDs
+export const N8N_PROJECT_ID = (import.meta as any).env?.VITE_N8N_PROJECT_ID || "rxQ8hI6Swqb7nEbu";
+export const N8N_FOLDER_ID = (import.meta as any).env?.VITE_N8N_FOLDER_ID || "NVYJCuJItmlVruSj";
+
 // Optional: default timeout for simulated requests
 export const DEFAULT_DELAY_MS = 250;
 

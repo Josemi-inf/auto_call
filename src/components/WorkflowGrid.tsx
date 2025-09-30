@@ -44,9 +44,59 @@ interface WorkflowCardProps {
 }
 
 function WorkflowCard({ workflow, stats, onToggleActive, onExecute, isExecuting }: WorkflowCardProps) {
+  const { toast } = useToast();
   const nodeCount = workflow.nodes?.length || 0;
   const hasWebhook = workflow.nodes?.some(node => node.type.includes('webhook')) || false;
   const configuredWebhookUrl = WEBHOOK_URLS[workflow.id];
+
+  // Get webhook URL from workflow nodes
+  const getWebhookUrl = () => {
+    if (configuredWebhookUrl) return configuredWebhookUrl;
+
+    const webhookNode = workflow.nodes?.find(node => node.type.includes('webhook'));
+    if (webhookNode && webhookNode.parameters) {
+      const path = webhookNode.parameters.path || workflow.id;
+      return `${import.meta.env.VITE_N8N_BASE_URL}/webhook/${path}`;
+    }
+    return null;
+  };
+
+  const webhookUrl = getWebhookUrl();
+
+  const handleWebhookTrigger = async () => {
+    if (!webhookUrl) return;
+
+    try {
+      const response = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source: 'n8n-lead-sync',
+          timestamp: new Date().toISOString(),
+          manual: true
+        })
+      });
+
+      if (response.ok) {
+        toast({
+          title: "✅ Workflow ejecutado",
+          description: `${workflow.name} ha sido disparado correctamente`,
+        });
+      } else {
+        toast({
+          title: "⚠️ Advertencia",
+          description: "El webhook fue llamado pero respondió con error",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "❌ Error",
+        description: "No se pudo ejecutar el workflow",
+        variant: "destructive",
+      });
+    }
+  };
 
   const getNodeTypes = () => {
     if (!workflow.nodes) return [];
@@ -82,7 +132,7 @@ function WorkflowCard({ workflow, stats, onToggleActive, onExecute, isExecuting 
           <div className="flex flex-wrap gap-1 mb-3">
             {workflow.tags?.map((tag, index) => (
               <Badge key={index} variant="outline" className="text-xs border-gray-200 text-gray-600 bg-gray-50">
-                {tag}
+                {typeof tag === 'string' ? tag : tag.name}
               </Badge>
             ))}
             {hasWebhook && (
@@ -232,36 +282,41 @@ function WorkflowCard({ workflow, stats, onToggleActive, onExecute, isExecuting 
 
       {/* Actions */}
       <div className="flex space-x-2 pt-2 border-t border-gray-200">
-        <Button
-          size="sm"
-          onClick={() => onExecute(workflow.id)}
-          disabled={isExecuting || !workflow.active}
-          className={`flex-1 ${
-            workflow.active
-              ? "bg-black text-white hover:bg-gray-800 shadow-lg shadow-black/10"
-              : "bg-gray-100 text-gray-400 cursor-not-allowed"
-          } transition-all duration-200`}
-        >
-          {isExecuting ? (
-            <>
-              <div className="animate-spin h-3 w-3 border border-current border-t-transparent rounded-full mr-2" />
-              Ejecutando...
-            </>
-          ) : (
-            <>
+        {webhookUrl ? (
+          <>
+            <Button
+              size="sm"
+              onClick={handleWebhookTrigger}
+              disabled={!workflow.active}
+              className={`flex-1 ${
+                workflow.active
+                  ? "bg-black text-white hover:bg-gray-800 shadow-lg shadow-black/10"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              } transition-all duration-200`}
+            >
               <Zap className="h-3 w-3 mr-2" />
               Ejecutar
-            </>
-          )}
-        </Button>
-
-        <Button
-          size="sm"
-          variant="outline"
-          className="border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
-        >
-          <ExternalLink className="h-3 w-3" />
-        </Button>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => window.open(`${import.meta.env.VITE_N8N_BASE_URL}/workflow/${workflow.id}`, '_blank')}
+              className="border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+            >
+              <ExternalLink className="h-3 w-3" />
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => window.open(`${import.meta.env.VITE_N8N_BASE_URL}/workflow/${workflow.id}`, '_blank')}
+            className="flex-1 border-gray-300 text-gray-600 hover:bg-gray-50 hover:border-gray-400 transition-all duration-200"
+          >
+            <ExternalLink className="h-3 w-3 mr-2" />
+            Abrir en n8n
+          </Button>
+        )}
       </div>
     </Card>
   );
@@ -272,7 +327,7 @@ export default function WorkflowGrid() {
   const { toast } = useToast();
   const [executingWorkflows, setExecutingWorkflows] = useState<Set<string>>(new Set());
 
-  // Fetch workflows
+  // Fetch workflows from configured project/folder
   const {
     data: workflows = [],
     isLoading,
@@ -287,9 +342,11 @@ export default function WorkflowGrid() {
 
   // Fetch stats for each workflow
   const { data: workflowStats = {} } = useQuery({
-    queryKey: ["workflow-stats", workflows.map(w => w.id)],
+    queryKey: ["workflow-stats", workflows?.map(w => w.id) ?? []],
     queryFn: async () => {
       const stats: Record<string, WorkflowStats> = {};
+      if (!workflows || !Array.isArray(workflows)) return stats;
+
       await Promise.all(
         workflows.map(async (workflow) => {
           try {
@@ -306,7 +363,7 @@ export default function WorkflowGrid() {
       );
       return stats;
     },
-    enabled: workflows.length > 0,
+    enabled: !!workflows && Array.isArray(workflows) && workflows.length > 0,
     refetchInterval: 60000, // Refetch every minute
   });
 
@@ -416,8 +473,10 @@ export default function WorkflowGrid() {
     );
   }
 
-  const activeWorkflows = workflows.filter(w => w.active);
-  const inactiveWorkflows = workflows.filter(w => !w.active);
+  // Safety check: ensure workflows is an array
+  const safeWorkflows = Array.isArray(workflows) ? workflows : [];
+  const activeWorkflows = safeWorkflows.filter(w => w.active);
+  const inactiveWorkflows = safeWorkflows.filter(w => !w.active);
 
   return (
     <div className="p-8">
@@ -449,7 +508,7 @@ export default function WorkflowGrid() {
               <Activity className="h-5 w-5 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{workflows.length}</p>
+              <p className="text-2xl font-bold">{safeWorkflows.length}</p>
               <p className="text-sm text-muted-foreground">Total Workflows</p>
             </div>
           </div>
@@ -516,7 +575,7 @@ export default function WorkflowGrid() {
 
         <TabsContent value="all" className="mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-            {workflows.map((workflow) => (
+            {safeWorkflows.map((workflow) => (
               <WorkflowCard
                 key={workflow.id}
                 workflow={workflow}

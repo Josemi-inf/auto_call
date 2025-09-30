@@ -47,8 +47,13 @@ export default function N8nConfig() {
       const testUrl = config.baseUrl.endsWith('/') ? config.baseUrl.slice(0, -1) : config.baseUrl;
 
       try {
-        // Simple fetch test to see if the endpoint is reachable
-        const response = await fetch(`${testUrl}/api/v1/workflows?limit=1`, {
+        // Use proxy in development to avoid CORS
+        const isDev = import.meta.env.DEV;
+        const url = isDev
+          ? '/n8n-api/workflows?limit=1'
+          : `${testUrl}/api/v1/workflows?limit=1`;
+
+        const response = await fetch(url, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
@@ -110,8 +115,13 @@ export default function N8nConfig() {
       // Test the connection with the new config
       if (newConfig.baseUrl) {
         try {
+          const isDev = import.meta.env.DEV;
           const testUrl = newConfig.baseUrl.endsWith('/') ? newConfig.baseUrl.slice(0, -1) : newConfig.baseUrl;
-          const response = await fetch(`${testUrl}/api/v1/workflows?limit=1`, {
+          const url = isDev
+            ? '/n8n-api/workflows?limit=1'
+            : `${testUrl}/api/v1/workflows?limit=1`;
+
+          const response = await fetch(url, {
             method: 'GET',
             headers: {
               'Content-Type': 'application/json',
