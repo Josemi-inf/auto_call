@@ -98,37 +98,45 @@ app.use(errorHandler);
 // ==================
 
 const startServer = async () => {
-  try {
-    // Test database connection
-    console.log('🔌 Testing database connection...');
-    await testConnection();
+  // Start server immediately
+  app.listen(PORT, () => {
+    console.log('');
+    console.log('╔════════════════════════════════════════════╗');
+    console.log('║   🚀 n8n Lead Sync API Server Started     ║');
+    console.log('╚════════════════════════════════════════════╝');
+    console.log('');
+    console.log(`📡 Server:        http://localhost:${PORT}`);
+    console.log(`🏥 Health Check:  http://localhost:${PORT}/api/health`);
+    console.log(`📊 Leads API:     http://localhost:${PORT}/api/leads`);
+    console.log(`🌍 Environment:   ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🔒 CORS Origin:   ${process.env.FRONTEND_URL || 'http://localhost:8080'}`);
+    console.log('');
+    console.log('⚡ Server is ready to accept connections');
+    console.log('');
 
-    // Start server
-    app.listen(PORT, () => {
-      console.log('');
-      console.log('╔════════════════════════════════════════════╗');
-      console.log('║   🚀 n8n Lead Sync API Server Started     ║');
-      console.log('╚════════════════════════════════════════════╝');
-      console.log('');
-      console.log(`📡 Server:        http://localhost:${PORT}`);
-      console.log(`🏥 Health Check:  http://localhost:${PORT}/api/health`);
-      console.log(`📊 Leads API:     http://localhost:${PORT}/api/leads`);
-      console.log(`🌍 Environment:   ${process.env.NODE_ENV || 'development'}`);
-      console.log(`🔒 CORS Origin:   ${process.env.FRONTEND_URL || 'http://localhost:8080'}`);
-      console.log('');
-      console.log('⚡ Server is ready to accept connections');
-      console.log('');
-    });
-  } catch (error) {
-    console.error('❌ Failed to start server:', error.message);
-    console.error('');
-    console.error('Troubleshooting:');
-    console.error('1. Check your .env file configuration');
-    console.error('2. Verify database credentials');
-    console.error('3. Ensure PostgreSQL is running and accessible');
-    console.error('');
-    process.exit(1);
-  }
+    // Test database connection after server starts
+    console.log('🔌 Testing database connection...');
+    testConnection()
+      .then(() => {
+        console.log('✅ Database is ready');
+      })
+      .catch((error) => {
+        console.error('⚠️  Database connection failed:', error.message);
+        console.error('   Server is running but database queries will fail');
+        console.error('   Retrying connection in 10 seconds...');
+
+        // Retry connection every 10 seconds
+        const retryInterval = setInterval(async () => {
+          try {
+            await testConnection();
+            console.log('✅ Database connection restored');
+            clearInterval(retryInterval);
+          } catch (err) {
+            console.error('⚠️  Still cannot connect to database, retrying...');
+          }
+        }, 10000);
+      });
+  });
 };
 
 // Handle uncaught errors
