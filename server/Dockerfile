@@ -1,6 +1,9 @@
 # Dockerfile for n8n Lead Sync Backend
 FROM node:22-alpine
 
+# Install wget for health check
+RUN apk add --no-cache wget
+
 # Set working directory
 WORKDIR /app
 
