@@ -31,7 +31,11 @@ export const N8N_CONFIG = {
   apiKey: N8N_API_KEY,
   headers: {
     'Content-Type': 'application/json',
-    ...(N8N_API_KEY && { 'X-N8N-API-KEY': N8N_API_KEY })
+    'Accept': 'application/json',
+    ...(N8N_API_KEY && {
+      'X-N8N-API-KEY': N8N_API_KEY,
+      'Authorization': `Bearer ${N8N_API_KEY}`
+    })
   }
 };
 
