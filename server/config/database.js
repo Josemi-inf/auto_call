@@ -36,7 +36,11 @@ export const pool = new Pool({
   } : false,
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 5000, // Return an error after 5 seconds if connection could not be established
+  connectionTimeoutMillis: 30000, // Return an error after 30 seconds if connection could not be established
+  query_timeout: 30000, // Query timeout
+  statement_timeout: 30000, // Statement timeout
+  keepAlive: true,
+  keepAliveInitialDelayMillis: 10000,
 });
 
 // Test database connection
