@@ -44,9 +44,14 @@ git push origin main
 ```
 Name: n8n-lead-sync-api
 Build Context: /server
-Dockerfile Path: ./Dockerfile
+Dockerfile Path: Dockerfile
 Branch: main
 ```
+
+**⚠️ IMPORTANTE - Configuración de rutas:**
+- `Build Context` debe ser `/server` (CON slash inicial)
+- `Dockerfile Path` debe ser `Dockerfile` (SIN ./ y SIN slash)
+- Si usas `./Dockerfile` dará error de compilación
 
 ### 2.3 Configurar Variables de Entorno
 
