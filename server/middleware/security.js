@@ -52,16 +52,9 @@ export const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization']
 };
 
-// Helmet security headers
+// Helmet security headers - Disabled CSP for API responses
 export const helmetConfig = helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-    },
-  },
+  contentSecurityPolicy: false, // Disable CSP for API-only backend
   hsts: {
     maxAge: 31536000,
     includeSubDomains: true,
