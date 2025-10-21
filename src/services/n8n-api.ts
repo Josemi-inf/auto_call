@@ -128,35 +128,64 @@ class N8nApiService {
     }
 
     try {
-      // n8n API doesn't have a direct endpoint for project/folder filtering
-      // We need to fetch all workflows and filter by tag
-      const endpoint = '/workflows';
-
-      console.log(`[N8N API] Fetching all workflows from: ${endpoint}`);
+      console.log("[N8N API] Fetching ALL workflows with pagination...");
       console.log(`[N8N API] Will filter by tag: "autocall"`);
 
-      const response = await this.request<{ data: N8nWorkflow[] } | N8nWorkflow[]>(endpoint);
+      let allWorkflows: N8nWorkflow[] = [];
+      let cursor: string | undefined;
+      let hasMore = true;
+      let pageNumber = 1;
 
-      console.log("[N8N API] Raw response received");
+      // Fetch all pages using cursor-based pagination
+      while (hasMore) {
+        const endpoint = cursor
+          ? `/workflows?limit=100&cursor=${cursor}`
+          : '/workflows?limit=100';
 
-      let workflows: N8nWorkflow[] = [];
+        console.log(`[N8N API] Fetching page ${pageNumber}: ${endpoint}`);
 
-      // n8n API returns { data: [...] }, extract the array
-      if (response && typeof response === 'object' && 'data' in response) {
-        workflows = response.data;
-        console.log("[N8N API] Extracted workflows from response.data");
-      } else if (Array.isArray(response)) {
-        workflows = response;
-        console.log("[N8N API] Response is already an array");
-      } else {
-        console.warn("[N8N API] Unexpected response format:", response);
-        return mockN8nWorkflows;
+        const response = await this.request<{
+          data: N8nWorkflow[];
+          nextCursor?: string;
+        } | N8nWorkflow[]>(endpoint);
+
+        let pageWorkflows: N8nWorkflow[] = [];
+        let nextCursor: string | undefined;
+
+        // n8n API returns { data: [...], nextCursor: "..." }
+        if (response && typeof response === 'object' && 'data' in response) {
+          pageWorkflows = response.data;
+          nextCursor = response.nextCursor;
+          console.log(`[N8N API] Page ${pageNumber}: Got ${pageWorkflows.length} workflows, nextCursor: ${nextCursor ? 'exists' : 'none'}`);
+        } else if (Array.isArray(response)) {
+          pageWorkflows = response;
+          console.log(`[N8N API] Page ${pageNumber}: Got ${pageWorkflows.length} workflows (array format)`);
+        } else {
+          console.warn("[N8N API] Unexpected response format:", response);
+          break;
+        }
+
+        allWorkflows = allWorkflows.concat(pageWorkflows);
+
+        // Check if there are more pages
+        if (nextCursor) {
+          cursor = nextCursor;
+          pageNumber++;
+        } else {
+          hasMore = false;
+        }
+
+        // Safety limit: stop after 10 pages (1000 workflows max)
+        if (pageNumber > 10) {
+          console.warn("[N8N API] Reached safety limit of 10 pages");
+          break;
+        }
       }
 
-      console.log(`[N8N API] Fetched ${workflows.length} total workflows`);
+      console.log(`[N8N API] ✅ Fetched ${allWorkflows.length} total workflows across ${pageNumber} page(s)`);
 
       // Filter by tag "autocall"
-      const filteredWorkflows = workflows.filter(workflow => {
+      const filteredWorkflows = allWorkflows.filter(workflow => {
         if (!workflow.tags) return false;
         return workflow.tags.some(tag => {
           const tagName = typeof tag === 'string' ? tag : tag.name;

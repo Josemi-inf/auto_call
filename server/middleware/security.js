@@ -29,13 +29,20 @@ export const corsOptions = {
     const allowedOrigins = [
       process.env.FRONTEND_URL || 'http://localhost:8080',
       'http://localhost:8080',
-      'http://127.0.0.1:8080'
+      'http://localhost:8081',
+      'http://localhost:8082',
+      'http://localhost:8083',
+      'http://127.0.0.1:8080',
+      'http://127.0.0.1:8081',
+      'http://127.0.0.1:8082',
+      'http://127.0.0.1:8083'
     ];
 
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      console.warn(`CORS blocked request from origin: ${origin}`);
       callback(new Error('Not allowed by CORS'));
     }
   },

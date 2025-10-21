@@ -1,7 +1,3 @@
-¡Perfecto! Ahora que necesitas una pantalla de **estadísticas de los workflows**, con datos detallados sobre las llamadas y su rendimiento, aquí tienes el prompt actualizado que incluye esta nueva pantalla:
-
----
-
 **Descripción de la Aplicación:**
 
 Queremos desarrollar una **aplicación web** para gestionar los **leads** que entran en nuestra base de datos después de realizar campañas. La aplicación debe integrar la gestión de **leads**, el historial de interacciones, y los workflows creados con **n8n**, además de proporcionar un panel de control donde se puedan visualizar errores de los workflows integrados y estadísticas sobre las llamadas realizadas en los workflows.

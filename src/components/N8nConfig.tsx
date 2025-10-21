@@ -107,7 +107,7 @@ export default function N8nConfig() {
   // Save configuration mutation
   const saveConfigMutation = useMutation({
     mutationFn: async (newConfig: { baseUrl: string; apiKey: string }) => {
-      console.log("Saving config:", newConfig);
+      console.log("🔷 saveConfigMutation started:", newConfig);
 
       // Update the config using the hook (this will persist to localStorage)
       updateConfig(newConfig);
@@ -148,12 +148,14 @@ export default function N8nConfig() {
       return newConfig;
     },
     onSuccess: () => {
+      console.log("✅ saveConfigMutation onSuccess");
       toast({
         title: "✅ Configuración guardada",
         description: "La configuración de n8n ha sido guardada y probada",
       });
     },
     onError: (error) => {
+      console.error("❌ saveConfigMutation onError:", error);
       toast({
         title: "❌ Error al guardar",
         description: "No se pudo guardar la configuración",
@@ -170,7 +172,10 @@ export default function N8nConfig() {
   }, []);
 
   const handleSaveConfig = () => {
+    console.log('🔵 handleSaveConfig called', config);
+
     if (!config.baseUrl.trim()) {
+      console.log('❌ No base URL provided');
       toast({
         title: "❌ URL requerida",
         description: "Por favor ingresa la URL de tu instancia de n8n",
@@ -178,6 +183,11 @@ export default function N8nConfig() {
       });
       return;
     }
+
+    console.log('🟢 Calling saveConfigMutation with:', {
+      baseUrl: config.baseUrl.trim(),
+      apiKey: config.apiKey ? '***' : 'none'
+    });
 
     saveConfigMutation.mutate({
       baseUrl: config.baseUrl.trim(),
