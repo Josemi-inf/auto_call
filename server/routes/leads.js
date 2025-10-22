@@ -59,8 +59,8 @@ router.get('/', queryValidation, async (req, res, next) => {
       FROM leads l
       LEFT JOIN lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id
       LEFT JOIN concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
-      LEFT JOIN concesionarios c ON cm.concesionario_id = c.concesionario_id
-      LEFT JOIN marcas m ON cm.marca_id = m.marca_id
+      LEFT JOIN concesionario c ON cm.concesionario_id = c.concesionario_id
+      LEFT JOIN marca m ON cm.marca_id = m.marca_id
       WHERE l.activo = true AND l.opt_out = false
     `;
 
@@ -181,8 +181,8 @@ router.get('/:id', getLeadByIdValidation, async (req, res, next) => {
       FROM leads l
       LEFT JOIN lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id
       LEFT JOIN concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
-      LEFT JOIN concesionarios c ON cm.concesionario_id = c.concesionario_id
-      LEFT JOIN marcas m ON cm.marca_id = m.marca_id
+      LEFT JOIN concesionario c ON cm.concesionario_id = c.concesionario_id
+      LEFT JOIN marca m ON cm.marca_id = m.marca_id
       WHERE l.lead_id = $1
       GROUP BY l.lead_id
     `, [id]);
