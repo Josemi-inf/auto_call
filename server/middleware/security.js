@@ -26,16 +26,26 @@ export const strictLimiter = rateLimit({
 // CORS configuration
 export const corsOptions = {
   origin: (origin, callback) => {
+    // If FRONTEND_URL is *, allow all origins
+    if (process.env.FRONTEND_URL === '*') {
+      callback(null, true);
+      return;
+    }
+
     const allowedOrigins = [
       process.env.FRONTEND_URL || 'http://localhost:8080',
       'http://localhost:8080',
       'http://localhost:8081',
       'http://localhost:8082',
       'http://localhost:8083',
+      'http://localhost:8084',
+      'http://localhost:8085',
       'http://127.0.0.1:8080',
       'http://127.0.0.1:8081',
       'http://127.0.0.1:8082',
-      'http://127.0.0.1:8083'
+      'http://127.0.0.1:8083',
+      'http://127.0.0.1:8084',
+      'http://127.0.0.1:8085'
     ];
 
     // Allow requests with no origin (like mobile apps or curl requests)
