@@ -574,7 +574,7 @@ export default function WorkflowGrid() {
         </div>
 
         <TabsContent value="all" className="mt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
             {safeWorkflows.map((workflow) => (
               <WorkflowCard
                 key={workflow.id}
