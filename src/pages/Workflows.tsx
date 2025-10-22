@@ -14,7 +14,7 @@ export default function Workflows() {
       <Tabs defaultValue="workflows" className="w-full">
         <div className="border-b">
           <div className="px-8 pt-6">
-            <TabsList className="grid w-full max-w-md grid-cols-3">
+            <TabsList className="grid w-full max-w-md grid-cols-4">
               <TabsTrigger value="workflows" className="flex items-center space-x-2">
                 <Activity className="h-4 w-4" />
                 <span>Workflows n8n</span>
