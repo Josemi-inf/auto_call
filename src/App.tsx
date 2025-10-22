@@ -7,6 +7,7 @@ import { MainLayout } from "@/components/Layout/MainLayout";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Dashboard from "./pages/Dashboard";
 import Leads from "./pages/Leads";
+import LeadDetail from "./pages/LeadDetail";
 import Workflows from "./pages/Workflows";
 import Statistics from "./pages/Statistics";
 import Errors from "./pages/Errors";
@@ -28,6 +29,7 @@ const App = () => (
       <Routes>
         <Route path="/" element={<MainLayout><Dashboard /></MainLayout>} />
         <Route path="/leads" element={<MainLayout><Leads /></MainLayout>} />
+        <Route path="/leads/:leadId" element={<MainLayout><LeadDetail /></MainLayout>} />
         <Route path="/workflows" element={<MainLayout><Workflows /></MainLayout>} />
         <Route path="/stats" element={<MainLayout><Statistics /></MainLayout>} />
         <Route path="/errors" element={<MainLayout><Errors /></MainLayout>} />

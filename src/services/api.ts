@@ -6,6 +6,10 @@ import {
   WorkflowConfig,
   WorkflowStatsEntry,
   Lead,
+  CallRecord,
+  WhatsAppMessage,
+  LeadNote,
+  TimelineEvent,
 } from "@/types";
 import { mockLeads } from "@/services/mock";
 import {
@@ -35,6 +39,13 @@ async function maybeFetch<T>(path: string, init?: RequestInit, fallback?: T): Pr
 export async function getLeads(): Promise<Lead[]> {
   const response = await maybeFetch<{ data: Lead[] }>("/leads", undefined, { data: mockLeads });
   return response.data || response as any; // Handle both { data: [] } and [] formats
+}
+
+export async function getLeadById(leadId: string): Promise<Lead> {
+  const response = await maybeFetch<{ data: Lead }>(`/leads/${leadId}`, undefined, {
+    data: mockLeads.find(l => l.lead_id === leadId) || mockLeads[0]
+  });
+  return response.data || response as any;
 }
 
 // Workflows (webhooks)
@@ -194,4 +205,47 @@ export async function testWebhook(url: string): Promise<{ ok: boolean; message?:
       message: `Error de conexión: ${error instanceof Error ? error.message : 'Error desconocido'}`
     };
   }
+}
+
+// Lead Detail Functions
+
+export async function getCallHistory(leadId: string, brandDealershipId?: string): Promise<CallRecord[]> {
+  const query = brandDealershipId ? `?brand_dealership_id=${brandDealershipId}` : "";
+  return maybeFetch<CallRecord[]>(`/leads/${leadId}/calls${query}`, undefined, []);
+}
+
+export async function getWhatsAppMessages(leadId: string, brandDealershipId?: string): Promise<WhatsAppMessage[]> {
+  const query = brandDealershipId ? `?brand_dealership_id=${brandDealershipId}` : "";
+  return maybeFetch<WhatsAppMessage[]>(`/leads/${leadId}/whatsapp${query}`, undefined, []);
+}
+
+export async function getLeadNotes(leadId: string, brandDealershipId?: string): Promise<LeadNote[]> {
+  const query = brandDealershipId ? `?brand_dealership_id=${brandDealershipId}` : "";
+  return maybeFetch<LeadNote[]>(`/leads/${leadId}/notes${query}`, undefined, []);
+}
+
+export async function addLeadNote(leadId: string, brandDealershipId: string, content: string): Promise<LeadNote> {
+  if (!API_BASE_URL) {
+    await delay(DEFAULT_DELAY_MS);
+    return {
+      nota_id: `note_${Date.now()}`,
+      lead_id: leadId,
+      lead_concesionario_marca_id: brandDealershipId,
+      contenido: content,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      usuario_nombre: "Usuario Demo"
+    };
+  }
+  const res = await fetch(`${API_BASE_URL}/leads/${leadId}/notes`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ brand_dealership_id: brandDealershipId, content }),
+  });
+  if (!res.ok) throw new Error(`Create note failed: ${res.status}`);
+  return (await res.json()) as LeadNote;
+}
+
+export async function getLeadTimeline(leadId: string): Promise<TimelineEvent[]> {
+  return maybeFetch<TimelineEvent[]>(`/leads/${leadId}/timeline`, undefined, []);
 }

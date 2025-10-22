@@ -1,22 +1,24 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { getLeads } from "@/services/api";
 import type { Lead } from "@/types";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-  Phone, 
-  Mail, 
-  MessageSquare, 
-  Calendar, 
+import {
+  Phone,
+  Mail,
+  MessageSquare,
+  Calendar,
   Search,
   Filter,
   MoreVertical,
   User,
   Car,
-  Building
+  Building,
+  ExternalLink
 } from "lucide-react";
 
 // Datos obtenidos desde la API (con fallback a mocks en services)
@@ -110,6 +112,7 @@ const statusColors = {
 };
 
 export default function Leads() {
+  const navigate = useNavigate();
   const { data: leads } = useQuery({ queryKey: ["leads"], queryFn: getLeads });
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
@@ -222,6 +225,13 @@ export default function Leads() {
                   </div>
                 </div>
                 <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate(`/leads/${selectedLead.lead_id}`)}
+                  >
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Ver Detalle Completo
+                  </Button>
                   <Button className="bg-gradient-primary hover:bg-primary-hover">
                     <Phone className="h-4 w-4 mr-2" />
                     Llamar
