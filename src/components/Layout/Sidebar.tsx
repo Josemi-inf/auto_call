@@ -9,7 +9,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import logoImage from "@/assets/leadflow-logo.png";
+import logoImage from "@/assets/logo.png";
 
 const navigation = [
   { name: "Dashboard", href: "/", icon: Home },
@@ -27,16 +27,16 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center px-6 border-b border-sidebar-border">
         <div className="flex items-center space-x-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
-            <img 
-              src={logoImage} 
-              alt="LeadFlow Logo" 
-              className="h-full w-full object-cover"
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden bg-white p-1">
+            <img
+              src={logoImage}
+              alt="Auto Call Logo"
+              className="h-full w-full object-contain"
             />
           </div>
           <div>
-            <h1 className="text-lg font-bold text-sidebar-foreground">LeadFlow</h1>
-            <p className="text-xs text-muted-foreground">CRM Manager</p>
+            <h1 className="text-lg font-bold text-sidebar-foreground">Auto Call</h1>
+            <p className="text-xs text-muted-foreground">Lead Manager</p>
           </div>
         </div>
       </div>
