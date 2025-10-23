@@ -66,7 +66,9 @@ export function WhatsAppConversation({ leadId, brandDealershipId }: WhatsAppConv
 
       {/* Messages Container */}
       <div className="space-y-4 mb-4 max-h-96 overflow-y-auto p-4 bg-muted/20 rounded-lg">
-        {messages.map((message) => {
+        {messages
+          .sort((a, b) => new Date(a.timestamp_mensaje).getTime() - new Date(b.timestamp_mensaje).getTime())
+          .map((message) => {
           const isFromLead = message.sender === "lead";
           const isSystem = message.sender === "system";
           const isAutomatic = message.metadata?.tipo_automatico;
@@ -76,23 +78,27 @@ export function WhatsAppConversation({ leadId, brandDealershipId }: WhatsAppConv
               key={message.message_id}
               className={`flex ${isFromLead ? "justify-start" : "justify-end"}`}
             >
-              <div className={`max-w-[75%] ${isFromLead ? "" : "text-right"}`}>
+              <div className={`max-w-[75%]`}>
                 {/* Message Header */}
-                <div className="flex items-center space-x-2 mb-1 px-2">
+                <div className={`flex items-center space-x-2 mb-1 px-2 ${isFromLead ? "" : "justify-end"}`}>
                   {isFromLead ? (
-                    <UserIcon className="h-3 w-3 text-muted-foreground" />
+                    <>
+                      <UserIcon className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs text-muted-foreground font-medium">Lead</span>
+                    </>
                   ) : isSystem || isAutomatic ? (
-                    <Bot className="h-3 w-3 text-muted-foreground" />
+                    <>
+                      <Bot className="h-3 w-3 text-blue-500" />
+                      <span className="text-xs text-blue-600 font-medium">Sistema</span>
+                    </>
                   ) : (
-                    <UserIcon className="h-3 w-3 text-muted-foreground" />
+                    <>
+                      <UserIcon className="h-3 w-3 text-green-600" />
+                      <span className="text-xs text-green-600 font-medium">
+                        {message.metadata?.agente_nombre || "Agente"}
+                      </span>
+                    </>
                   )}
-                  <span className="text-xs text-muted-foreground">
-                    {isFromLead
-                      ? "Lead"
-                      : isSystem || isAutomatic
-                      ? "Sistema"
-                      : message.metadata?.agente_nombre || "Agente"}
-                  </span>
                   <span className="text-xs text-muted-foreground">
                     {new Date(message.timestamp_mensaje).toLocaleDateString()}{" "}
                     {new Date(message.timestamp_mensaje).toLocaleTimeString([], {

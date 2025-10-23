@@ -374,7 +374,7 @@ router.get('/:id/calls', async (req, res, next) => {
     const { brand_dealership_id } = req.query;
 
     let query = `
-      SELECT
+      SELECT DISTINCT ON (ll.llamada_id)
         ll.llamada_id,
         ll.lead_id,
         ll.numero_origen,
@@ -406,7 +406,7 @@ router.get('/:id/calls', async (req, res, next) => {
       params.push(brand_dealership_id);
     }
 
-    query += ` ORDER BY ll.fecha_llamada DESC`;
+    query += ` ORDER BY ll.llamada_id, ll.fecha_llamada DESC`;
 
     const result = await pool.query(query, params);
 
@@ -427,15 +427,25 @@ router.get('/:id/whatsapp', async (req, res, next) => {
     const { brand_dealership_id } = req.query;
 
     let query = `
-      SELECT
-        lm.message_id,
-        lm.conversacion_id,
+      SELECT DISTINCT ON (lm.id)
+        lm.id as message_id,
+        NULL as conversacion_id,
         lm.lead_id,
-        lm.tipo,
+        lm.tipo_mensaje as tipo,
         lm.contenido,
-        lm.sender,
-        lm.timestamp_mensaje,
-        lm.metadata,
+        CASE
+          WHEN lm.tipo_mensaje = 'enviado' THEN 'agent'
+          WHEN lm.tipo_mensaje = 'recibido' THEN 'lead'
+          ELSE 'system'
+        END as sender,
+        lm.created_at as timestamp_mensaje,
+        jsonb_build_object(
+          'enviado', lm.enviado,
+          'leido', lm.leido,
+          'respondido', lm.respondido,
+          'whatsapp_message_id', lm.whatsapp_message_id,
+          'media_url', lm.media_url
+        ) as metadata,
         lm.created_at,
         lcm.lead_concesionario_marca_id,
         c.nombre as concesionario,
@@ -446,7 +456,6 @@ router.get('/:id/whatsapp', async (req, res, next) => {
       LEFT JOIN public.concesionario c ON cm.concesionario_id = c.concesionario_id
       LEFT JOIN public.marca m ON cm.marca_id = m.marca_id
       WHERE lm.lead_id = $1
-      AND lm.tipo = 'whatsapp'
     `;
 
     const params = [id];
@@ -456,7 +465,7 @@ router.get('/:id/whatsapp', async (req, res, next) => {
       params.push(brand_dealership_id);
     }
 
-    query += ` ORDER BY lm.timestamp_mensaje ASC`;
+    query += ` ORDER BY lm.id, lm.created_at ASC`;
 
     const result = await pool.query(query, params);
 
@@ -476,11 +485,6 @@ router.get('/:id/notes', async (req, res, next) => {
     const { id } = req.params;
     const { brand_dealership_id } = req.query;
 
-    // Note: We need to create a notes table first
-    // For now, return empty array
-    res.json([]);
-
-    /* When notes table is created, use this query:
     let query = `
       SELECT
         n.nota_id,
@@ -490,11 +494,10 @@ router.get('/:id/notes', async (req, res, next) => {
         n.contenido,
         n.created_at,
         n.updated_at,
-        u.nombre as usuario_nombre,
+        NULL as usuario_nombre,
         c.nombre as concesionario,
         m.nombre as marca
       FROM public.lead_notes n
-      LEFT JOIN public.usuarios u ON n.usuario_id = u.usuario_id
       LEFT JOIN public.lead_concesionario_marca lcm ON n.lead_concesionario_marca_id = lcm.lead_concesionario_marca_id
       LEFT JOIN public.concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
       LEFT JOIN public.concesionario c ON cm.concesionario_id = c.concesionario_id
@@ -513,7 +516,6 @@ router.get('/:id/notes', async (req, res, next) => {
 
     const result = await pool.query(query, params);
     res.json(result.rows);
-    */
   } catch (error) {
     next(error);
   }
@@ -532,29 +534,13 @@ router.post('/:id/notes', async (req, res, next) => {
       return res.status(400).json({ error: 'Note content is required' });
     }
 
-    // For now, return a mock response
-    // When notes table is created, implement the actual insert
-    const mockNote = {
-      nota_id: `note_${Date.now()}`,
-      lead_id: id,
-      lead_concesionario_marca_id: brand_dealership_id,
-      contenido: content,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-      usuario_nombre: 'Usuario Demo'
-    };
-
-    res.status(201).json(mockNote);
-
-    /* When notes table is created, use this:
     const result = await pool.query(`
       INSERT INTO public.lead_notes (lead_id, lead_concesionario_marca_id, contenido, usuario_id)
       VALUES ($1, $2, $3, $4)
       RETURNING *
-    `, [id, brand_dealership_id, content, null]);
+    `, [id, brand_dealership_id || null, content, null]);
 
     res.status(201).json(result.rows[0]);
-    */
   } catch (error) {
     next(error);
   }
@@ -600,24 +586,29 @@ router.get('/:id/timeline', async (req, res, next) => {
     // Get WhatsApp messages
     const whatsapp = await pool.query(`
       SELECT
-        lm.message_id as id,
+        lm.id,
         'whatsapp' as tipo,
-        lm.timestamp_mensaje as fecha,
+        lm.created_at as fecha,
         CASE
-          WHEN lm.sender = 'lead' THEN '💬 WhatsApp recibido'
-          WHEN lm.sender = 'system' THEN '💬 WhatsApp automático enviado'
-          ELSE '💬 WhatsApp enviado'
+          WHEN lm.tipo_mensaje = 'recibido' THEN '💬 WhatsApp recibido'
+          WHEN lm.tipo_mensaje = 'enviado' THEN '💬 WhatsApp enviado'
+          ELSE '💬 WhatsApp'
         END as descripcion,
         c.nombre as marca,
         con.nombre as concesionario,
-        lm.metadata->>'agente_nombre' as agente,
-        lm.metadata
+        NULL as agente,
+        jsonb_build_object(
+          'contenido', lm.contenido,
+          'enviado', lm.enviado,
+          'leido', lm.leido,
+          'respondido', lm.respondido
+        ) as metadata
       FROM public.lead_messages lm
       LEFT JOIN public.lead_concesionario_marca lcm ON lm.lead_id = lcm.lead_id
       LEFT JOIN public.concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
       LEFT JOIN public.concesionario con ON cm.concesionario_id = con.concesionario_id
       LEFT JOIN public.marca c ON cm.marca_id = c.marca_id
-      WHERE lm.lead_id = $1 AND lm.tipo = 'whatsapp'
+      WHERE lm.lead_id = $1
     `, [id]);
 
     timeline.push(...whatsapp.rows);
@@ -663,6 +654,111 @@ router.get('/:id/timeline', async (req, res, next) => {
     timeline.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
 
     res.json(timeline);
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * GET /api/leads/activity/recent
+ * Get recent activity across all leads (for dashboard)
+ */
+router.get('/activity/recent', async (req, res, next) => {
+  try {
+    const { limit = 10 } = req.query;
+
+    // Get recent leads created
+    const recentLeads = await pool.query(`
+      SELECT
+        l.lead_id as id,
+        'lead_created' as type,
+        CONCAT('Nuevo lead: ', l.nombre, ' ', l.apellidos) as message,
+        l.created_at as timestamp,
+        'success' as status
+      FROM public.leads l
+      ORDER BY l.created_at DESC
+      LIMIT 5
+    `);
+
+    // Get recent calls
+    const recentCalls = await pool.query(`
+      SELECT
+        ll.llamada_id as id,
+        CASE
+          WHEN ll.estado = 'successful' THEN 'call_completed'
+          WHEN ll.estado = 'failed' THEN 'call_failed'
+          ELSE 'call_attempted'
+        END as type,
+        CONCAT('Llamada ', ll.estado, ' - ', l.nombre, ' ', l.apellidos) as message,
+        ll.fecha_llamada as timestamp,
+        CASE
+          WHEN ll.estado = 'successful' THEN 'success'
+          WHEN ll.estado = 'failed' THEN 'error'
+          ELSE 'warning'
+        END as status
+      FROM public.llamadas ll
+      LEFT JOIN public.leads l ON ll.lead_id = l.lead_id
+      ORDER BY ll.fecha_llamada DESC
+      LIMIT 5
+    `);
+
+    // Get recent WhatsApp messages
+    const recentMessages = await pool.query(`
+      SELECT
+        lm.id as id,
+        CASE
+          WHEN lm.tipo_mensaje = 'recibido' THEN 'message_received'
+          WHEN lm.tipo_mensaje = 'enviado' THEN 'message_sent'
+          ELSE 'message'
+        END as type,
+        CONCAT('WhatsApp ', lm.tipo_mensaje, ' - ', l.nombre, ' ', l.apellidos) as message,
+        lm.created_at as timestamp,
+        'success' as status
+      FROM public.lead_messages lm
+      LEFT JOIN public.leads l ON lm.lead_id = l.lead_id
+      ORDER BY lm.created_at DESC
+      LIMIT 5
+    `);
+
+    // Combine all activities (notes table doesn't exist yet)
+    const activities = [
+      ...recentLeads.rows,
+      ...recentCalls.rows,
+      ...recentMessages.rows
+    ];
+
+    // Sort by timestamp descending and limit
+    activities.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    const limitedActivities = activities.slice(0, parseInt(limit));
+
+    // Format timestamps to relative time
+    const formattedActivities = limitedActivities.map(activity => {
+      const now = new Date();
+      const activityDate = new Date(activity.timestamp);
+      const diffMs = now - activityDate;
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffHours = Math.floor(diffMs / 3600000);
+      const diffDays = Math.floor(diffMs / 86400000);
+
+      let timeAgo;
+      if (diffMins < 1) {
+        timeAgo = 'Hace un momento';
+      } else if (diffMins < 60) {
+        timeAgo = `Hace ${diffMins} minuto${diffMins > 1 ? 's' : ''}`;
+      } else if (diffHours < 24) {
+        timeAgo = `Hace ${diffHours} hora${diffHours > 1 ? 's' : ''}`;
+      } else {
+        timeAgo = `Hace ${diffDays} día${diffDays > 1 ? 's' : ''}`;
+      }
+
+      return {
+        ...activity,
+        time: timeAgo,
+        created_at: activity.timestamp
+      };
+    });
+
+    res.json(formattedActivities);
   } catch (error) {
     next(error);
   }

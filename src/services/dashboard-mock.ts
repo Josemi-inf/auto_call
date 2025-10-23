@@ -1,3 +1,6 @@
+// Re-export stats functions from API
+export { getStatsOverview, getStatsByMarca } from "./api";
+
 // Mock service para el dashboard mientras configuramos la conexión correcta
 export interface DashboardStats {
   totalLeads: number;

@@ -14,7 +14,6 @@ import {
   Calendar,
   Search,
   Filter,
-  MoreVertical,
   User,
   Car,
   Building,
@@ -135,7 +134,7 @@ export default function Leads() {
   return (
     <div className="flex h-screen">
       {/* Leads List */}
-      <div className="w-1/3 border-r border-border bg-card">
+      <div className="w-80 border-r border-border bg-card flex-shrink-0">
         <div className="p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">Leads</h2>
           <div className="flex space-x-2">
@@ -163,42 +162,20 @@ export default function Leads() {
               }`}
               onClick={() => setSelectedLead(lead)}
             >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center space-x-2 mb-2">
-                    <h3 className="font-medium text-card-foreground">
-                      {lead.nombre} {lead.apellidos}
-                    </h3>
-                    <Badge className={`text-xs ${statusColors[lead.estado_actual as keyof typeof statusColors]}`}>
-                      {lead.estado_actual}
-                    </Badge>
+              <div className="space-y-2">
+                <h3 className="font-medium text-card-foreground">
+                  {lead.nombre} {lead.apellidos}
+                </h3>
+                <div className="space-y-1 text-sm text-muted-foreground">
+                  <div className="flex items-center space-x-2">
+                    <Phone className="h-3 w-3" />
+                    <span className="truncate">{lead.telefono}</span>
                   </div>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    <div className="flex items-center space-x-2">
-                      <Car className="h-3 w-3" />
-                      <span>{lead.marca} {lead.modelo}</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Building className="h-3 w-3" />
-                      <span>{lead.concesionario}</span>
-                    </div>
-                    {lead.intentos_compra[0] && (
-                      <>
-                        <div className="flex items-center space-x-2">
-                          <Car className="h-3 w-3" />
-                          <span>{lead.intentos_compra[0].marca} {lead.intentos_compra[0].modelo}</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Building className="h-3 w-3" />
-                          <span>{lead.intentos_compra[0].concesionario}</span>
-                        </div>
-                      </>
-                    )}
+                  <div className="flex items-center space-x-2">
+                    <Mail className="h-3 w-3" />
+                    <span className="truncate">{lead.email}</span>
                   </div>
                 </div>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="h-4 w-4" />
-                </Button>
               </div>
             </div>
           ))}
@@ -255,31 +232,44 @@ export default function Leads() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Estado</label>
-                    <Badge className={`mt-1 ${statusColors[selectedLead.estado_actual as keyof typeof statusColors]}`}>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Estado</label>
+                    <Badge className={`${statusColors[selectedLead.estado_actual as keyof typeof statusColors]}`}>
                       {selectedLead.estado_actual}
                     </Badge>
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-muted-foreground">Último contacto</label>
+                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Último contacto</label>
                     <p className="text-sm text-card-foreground">
                       {new Date(selectedLead.last_contact_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Concesionario</label>
-                  <p className="text-sm text-card-foreground">{selectedLead.concesionario}</p>
-                </div>
+              </div>
+            </Card>
+
+            {/* Vehicle & Dealership Info */}
+            <Card className="p-6 border border-border shadow-custom-sm">
+              <h3 className="text-lg font-semibold text-card-foreground mb-4 flex items-center space-x-2">
+                <Car className="h-5 w-5" />
+                <span>Vehículo de Interés</span>
+              </h3>
+              <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Marca</label>
-                    <p className="text-sm text-card-foreground">{selectedLead.marca}</p>
+                    <p className="text-sm text-card-foreground font-medium">{selectedLead.marca}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-muted-foreground">Modelo</label>
-                    <p className="text-sm text-card-foreground">{selectedLead.modelo}</p>
+                    <p className="text-sm text-card-foreground font-medium">{selectedLead.modelo}</p>
                   </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-muted-foreground flex items-center space-x-2">
+                    <Building className="h-4 w-4" />
+                    <span>Concesionario</span>
+                  </label>
+                  <p className="text-sm text-card-foreground font-medium mt-1">{selectedLead.concesionario}</p>
                 </div>
               </div>
             </Card>

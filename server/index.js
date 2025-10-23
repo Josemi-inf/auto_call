@@ -16,6 +16,7 @@ import {
 // Import routes
 import leadsRouter from './routes/leads.js';
 import healthRouter from './routes/health.js';
+import statsRouter from './routes/stats.js';
 
 // Load environment variables
 dotenv.config();
@@ -60,6 +61,7 @@ app.use('/api/health', healthRouter);
 
 // API routes
 app.use('/api/leads', leadsRouter);
+app.use('/api/stats', statsRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
@@ -70,6 +72,7 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/api/health',
       leads: '/api/leads',
+      stats: '/api/stats',
       documentation: '/api/docs (coming soon)'
     }
   });

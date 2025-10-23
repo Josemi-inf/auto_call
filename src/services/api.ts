@@ -10,6 +10,11 @@ import {
   WhatsAppMessage,
   LeadNote,
   TimelineEvent,
+  StatsOverview,
+  StatsByMarca,
+  StatsAdvanced,
+  StatsRanking,
+  StatsTimeline,
 } from "@/types";
 import { mockLeads } from "@/services/mock";
 import {
@@ -248,4 +253,76 @@ export async function addLeadNote(leadId: string, brandDealershipId: string, con
 
 export async function getLeadTimeline(leadId: string): Promise<TimelineEvent[]> {
   return maybeFetch<TimelineEvent[]>(`/leads/${leadId}/timeline`, undefined, []);
+}
+
+// Statistics API
+export async function getStatsOverview(params?: {
+  start_date?: string;
+  end_date?: string;
+  marca_id?: string;
+  concesionario_id?: string;
+}): Promise<StatsOverview> {
+  const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+  return maybeFetch<StatsOverview>(`/stats/overview${query}`, undefined, {
+    total_leads: 0,
+    total_llamadas: 0,
+    leads_exitosos: 0,
+    porcentaje_exito: 0,
+    leads_no_interesados: 0,
+    no_conectaron: 0,
+    buzon_voz: 0,
+    llamadas_fallidas: 0,
+    duracion_promedio: 0,
+    intentos_medio: 0,
+  });
+}
+
+export async function getStatsByMarca(params?: {
+  start_date?: string;
+  end_date?: string;
+}): Promise<StatsByMarca[]> {
+  const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+  return maybeFetch<StatsByMarca[]>(`/stats/by-marca${query}`, undefined, []);
+}
+
+export async function getStatsAdvanced(params?: {
+  start_date?: string;
+  end_date?: string;
+}): Promise<StatsAdvanced[]> {
+  const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+  return maybeFetch<StatsAdvanced[]>(`/stats/advanced${query}`, undefined, []);
+}
+
+export async function getStatsRanking(params?: {
+  start_date?: string;
+  end_date?: string;
+  limit?: number;
+}): Promise<StatsRanking[]> {
+  const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+  return maybeFetch<StatsRanking[]>(`/stats/ranking${query}`, undefined, []);
+}
+
+export async function getStatsTimeline(params?: {
+  start_date?: string;
+  end_date?: string;
+  interval?: 'day' | 'week' | 'month';
+  marca_id?: string;
+}): Promise<StatsTimeline[]> {
+  const query = params ? `?${new URLSearchParams(params as any).toString()}` : "";
+  return maybeFetch<StatsTimeline[]>(`/stats/timeline${query}`, undefined, []);
+}
+
+// Activity
+export interface RecentActivity {
+  id: string;
+  type: 'lead_created' | 'call_completed' | 'call_failed' | 'call_attempted' | 'message_received' | 'message_sent' | 'note_added';
+  message: string;
+  time: string;
+  status: 'success' | 'error' | 'warning';
+  created_at: Date;
+  timestamp: Date;
+}
+
+export async function getRecentActivity(limit: number = 10): Promise<RecentActivity[]> {
+  return maybeFetch<RecentActivity[]>(`/leads/activity/recent?limit=${limit}`, undefined, []);
 }

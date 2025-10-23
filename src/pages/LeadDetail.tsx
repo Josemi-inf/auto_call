@@ -3,9 +3,10 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { getLeadById } from "@/services/api";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { BrandDealershipCard } from "@/components/LeadDetail/BrandDealershipCard";
 import { CallHistory } from "@/components/LeadDetail/CallHistory";
 import { WhatsAppConversation } from "@/components/LeadDetail/WhatsAppConversation";
@@ -209,55 +210,157 @@ export default function LeadDetail() {
             </div>
           </Card>
 
-          {/* Brand/Dealership Cards */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-card-foreground flex items-center space-x-2">
-              <span>🚗</span>
-              <span>Intereses por Marca/Concesionario</span>
-            </h3>
-            {lead.intentos_compra && lead.intentos_compra.length > 0 ? (
-              lead.intentos_compra.map((intento) => (
-                <BrandDealershipCard
-                  key={intento.lead_concesionario_marca_id}
-                  intento={intento}
-                  leadId={lead.lead_id}
-                  isSelected={selectedBrand === intento.lead_concesionario_marca_id}
-                  onSelect={() => setSelectedBrand(
-                    selectedBrand === intento.lead_concesionario_marca_id
-                      ? null
-                      : intento.lead_concesionario_marca_id
-                  )}
-                />
-              ))
-            ) : (
-              <Card className="p-6 text-center">
-                <p className="text-muted-foreground">
-                  No hay intentos de compra registrados para este lead
-                </p>
-              </Card>
-            )}
-          </div>
+          {/* Tabs Navigation */}
+          <Tabs defaultValue="intereses" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-flex">
+              <TabsTrigger value="intereses" className="flex items-center space-x-2">
+                <Car className="h-4 w-4" />
+                <span>Intereses</span>
+              </TabsTrigger>
+              <TabsTrigger value="llamadas" className="flex items-center space-x-2">
+                <Phone className="h-4 w-4" />
+                <span>Llamadas</span>
+              </TabsTrigger>
+              <TabsTrigger value="whatsapp" className="flex items-center space-x-2">
+                <MessageSquare className="h-4 w-4" />
+                <span>WhatsApp</span>
+              </TabsTrigger>
+              <TabsTrigger value="notas" className="flex items-center space-x-2">
+                <StickyNote className="h-4 w-4" />
+                <span>Notas</span>
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Call History, WhatsApp, Notes - shown when a brand is selected */}
-          {selectedBrand && (
-            <>
+            {/* Intereses Tab */}
+            <TabsContent value="intereses" className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-card-foreground flex items-center space-x-2">
+                  <span>🚗</span>
+                  <span>Intereses por Marca/Concesionario</span>
+                </h3>
+                {lead.intentos_compra && lead.intentos_compra.length > 0 && (
+                  <Badge variant="outline" className="bg-primary/5">
+                    {lead.intentos_compra.length} {lead.intentos_compra.length === 1 ? 'interés' : 'intereses'}
+                  </Badge>
+                )}
+              </div>
+              {lead.intentos_compra && lead.intentos_compra.length > 0 ? (
+                <div className="space-y-4">
+                  {lead.intentos_compra.map((intento) => (
+                    <BrandDealershipCard
+                      key={intento.lead_concesionario_marca_id}
+                      intento={intento}
+                      leadId={lead.lead_id}
+                      isSelected={selectedBrand === intento.lead_concesionario_marca_id}
+                      onSelect={() => setSelectedBrand(
+                        selectedBrand === intento.lead_concesionario_marca_id
+                          ? null
+                          : intento.lead_concesionario_marca_id
+                      )}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <Card className="p-12 text-center border-dashed">
+                  <div className="flex flex-col items-center space-y-3">
+                    <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
+                      <Car className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground text-lg font-medium">
+                      No hay intereses registrados
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Este lead aún no ha mostrado interés en ninguna marca o concesionario
+                    </p>
+                  </div>
+                </Card>
+              )}
+            </TabsContent>
+
+            {/* Llamadas Tab */}
+            <TabsContent value="llamadas" className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-card-foreground flex items-center space-x-2">
+                  <Phone className="h-5 w-5" />
+                  <span>Historial de Llamadas</span>
+                </h3>
+                <div className="flex items-center space-x-2">
+                  {selectedBrand && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedBrand(null)}
+                    >
+                      Ver todas
+                    </Button>
+                  )}
+                </div>
+              </div>
               <CallHistory
                 leadId={lead.lead_id}
-                brandDealershipId={selectedBrand}
+                brandDealershipId={selectedBrand || undefined}
               />
+            </TabsContent>
+
+            {/* WhatsApp Tab */}
+            <TabsContent value="whatsapp" className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-card-foreground flex items-center space-x-2">
+                  <MessageSquare className="h-5 w-5" />
+                  <span>Conversaciones WhatsApp</span>
+                </h3>
+                <div className="flex items-center space-x-2">
+                  {selectedBrand && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedBrand(null)}
+                    >
+                      Ver todas
+                    </Button>
+                  )}
+                </div>
+              </div>
               <WhatsAppConversation
                 leadId={lead.lead_id}
-                brandDealershipId={selectedBrand}
+                brandDealershipId={selectedBrand || undefined}
               />
+            </TabsContent>
+
+            {/* Notas Tab */}
+            <TabsContent value="notas" className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-card-foreground flex items-center space-x-2">
+                  <StickyNote className="h-5 w-5" />
+                  <span>Notas del Lead</span>
+                </h3>
+                <div className="flex items-center space-x-2">
+                  {selectedBrand && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setSelectedBrand(null)}
+                    >
+                      Ver todas
+                    </Button>
+                  )}
+                </div>
+              </div>
               <NotesSection
                 leadId={lead.lead_id}
-                brandDealershipId={selectedBrand}
+                brandDealershipId={selectedBrand || undefined}
               />
-            </>
-          )}
+            </TabsContent>
+          </Tabs>
 
           {/* Unified Timeline */}
-          <UnifiedTimeline leadId={lead.lead_id} />
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold text-card-foreground flex items-center space-x-2 mb-6">
+              <History className="h-5 w-5" />
+              <span>Timeline Unificado</span>
+            </h3>
+            <UnifiedTimeline leadId={lead.lead_id} />
+          </Card>
         </div>
       </div>
     </div>

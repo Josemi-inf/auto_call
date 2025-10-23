@@ -178,6 +178,68 @@ export interface WorkflowStatsEntry {
   percentage: number; // success rate
 }
 
+// Statistics types
+export interface StatsOverview {
+  total_leads: number;
+  total_llamadas: number;
+  leads_exitosos: number;
+  porcentaje_exito: number;
+  leads_no_interesados: number;
+  no_conectaron: number;
+  buzon_voz: number;
+  llamadas_fallidas: number;
+  duracion_promedio: number;
+  intentos_medio: number;
+}
+
+export interface StatsByMarca {
+  marca_id: string;
+  marca: string;
+  total_leads: number;
+  total_llamadas: number;
+  leads_exitosos: number;
+  porcentaje_exito: number;
+  leads_no_interesados: number;
+  no_conectaron: number;
+  buzon_voz: number;
+  rellamadas: number;
+  intentos_medio: number;
+  duracion_promedio: number;
+}
+
+export interface StatsAdvanced {
+  marca_id: string;
+  marca: string;
+  tasa_exito: number;
+  tasa_rechazo: number;
+  tasa_contacto: number;
+  eficiencia_llamadas: number;
+  llamadas_por_lead: number;
+  porcentaje_no_contesta: number;
+  porcentaje_buzon: number;
+  total_incontactables: number;
+  evaluacion: 'Regular' | 'Mejorar' | 'Excelente';
+  prioridad_recontacto: 'ALTA' | 'MEDIA' | 'BAJA';
+}
+
+export interface StatsRanking {
+  posicion: number;
+  marca_id: string;
+  marca: string;
+  total_leads: number;
+  leads_exitosos: number;
+  tasa_exito: number;
+  total_llamadas: number;
+}
+
+export interface StatsTimeline {
+  periodo: string;
+  total_leads: number;
+  total_llamadas: number;
+  leads_exitosos: number;
+  tasa_exito: number;
+}
+
 export interface PieEntry {
   name: string;
   value: number;

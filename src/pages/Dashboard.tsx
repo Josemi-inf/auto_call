@@ -1,10 +1,11 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Users, GitBranch, AlertTriangle, TrendingUp, Phone, Clock, Plus, Settings, BarChart3, Eye } from "lucide-react";
+import { Users, GitBranch, AlertTriangle, TrendingUp, Phone, Clock, Plus, Settings, BarChart3, Eye, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { getDashboardStats, getRecentActivity, getWeeklyLeadsData, getWorkflowPerformance, type DashboardStats, type RecentActivity } from "@/services/dashboard-mock";
+import { getStatsOverview, getStatsByMarca, getWeeklyLeadsData, getWorkflowPerformance } from "@/services/dashboard-mock";
+import { getRecentActivity, type RecentActivity } from "@/services/api";
 import { useNavigate } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
@@ -13,16 +14,22 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 export default function Dashboard() {
   const navigate = useNavigate();
 
-  // Queries para obtener datos reales
-  const { data: stats, isLoading: statsLoading } = useQuery({
-    queryKey: ['dashboard-stats'],
-    queryFn: getDashboardStats,
+  // Queries para obtener datos reales desde la API de estadísticas
+  const { data: overview, isLoading: statsLoading } = useQuery({
+    queryKey: ['stats-overview'],
+    queryFn: () => getStatsOverview({}),
     refetchInterval: 30000, // Actualizar cada 30 segundos
+  });
+
+  const { data: byMarca } = useQuery({
+    queryKey: ['stats-by-marca'],
+    queryFn: () => getStatsByMarca({}),
+    refetchInterval: 30000,
   });
 
   const { data: activity, isLoading: activityLoading } = useQuery({
     queryKey: ['recent-activity'],
-    queryFn: getRecentActivity,
+    queryFn: () => getRecentActivity(10),
     refetchInterval: 30000,
   });
 
@@ -36,47 +43,41 @@ export default function Dashboard() {
     queryFn: getWorkflowPerformance,
   });
 
-  // Formatear datos para las estadísticas
-  const formatStatsData = (stats: DashboardStats | undefined) => {
-    if (!stats) return [];
-
-    return [
-      {
-        name: "Total Leads",
-        value: stats.totalLeads.toLocaleString(),
-        change: `${stats.weeklyGrowth >= 0 ? '+' : ''}${stats.weeklyGrowth}%`,
-        changeType: stats.weeklyGrowth >= 0 ? "positive" : "negative",
-        icon: Users,
-        color: "stats-calls",
-      },
-      {
-        name: "Leads Activos",
-        value: stats.activeLeads.toLocaleString(),
-        change: `${stats.activeLeads} de ${stats.totalLeads}`,
-        changeType: "neutral",
-        icon: Users,
-        color: "stats-success",
-      },
-      {
-        name: "Workflows Activos",
-        value: stats.activeWorkflows.toString(),
-        change: "En ejecución",
-        changeType: "positive",
-        icon: GitBranch,
-        color: "stats-duration",
-      },
-      {
-        name: "Errores Pendientes",
-        value: stats.pendingErrors.toString(),
-        change: stats.pendingErrors > 0 ? "Requiere atención" : "Todo OK",
-        changeType: stats.pendingErrors > 0 ? "negative" : "positive",
-        icon: AlertTriangle,
-        color: "stats-error",
-      },
-    ];
-  };
-
-  const statsData = formatStatsData(stats);
+  // Formatear datos para las estadísticas usando los datos reales
+  const statsData = overview ? [
+    {
+      name: "Total Leads",
+      value: overview.total_leads?.toString() || "0",
+      change: `${parseFloat((overview.porcentaje_exito || 0).toString()).toFixed(1)}% éxito`,
+      changeType: parseFloat((overview.porcentaje_exito || 0).toString()) >= 50 ? "positive" : "negative",
+      icon: Users,
+      color: "stats-calls",
+    },
+    {
+      name: "Total Llamadas",
+      value: overview.total_llamadas?.toString() || "0",
+      change: `${parseFloat((overview.intentos_medio || 0).toString()).toFixed(1)} intentos/lead`,
+      changeType: "neutral",
+      icon: Phone,
+      color: "stats-duration",
+    },
+    {
+      name: "Leads Exitosos",
+      value: overview.leads_exitosos?.toString() || "0",
+      change: `${parseFloat((overview.porcentaje_exito || 0).toString()).toFixed(1)}% tasa de éxito`,
+      changeType: "positive",
+      icon: CheckCircle2,
+      color: "stats-success",
+    },
+    {
+      name: "Duración Promedio",
+      value: `${Math.floor(parseFloat((overview.duracion_promedio || 0).toString()) / 60)}:${(parseFloat((overview.duracion_promedio || 0).toString()) % 60).toFixed(0).padStart(2, '0')}`,
+      change: "minutos por llamada",
+      changeType: "neutral",
+      icon: Clock,
+      color: "stats-calls",
+    },
+  ] : [];
 
   return (
     <div className="p-8">
@@ -276,7 +277,7 @@ export default function Dashboard() {
                 <Users className="h-5 w-5 text-primary group-hover:text-primary/80" />
                 <div className="text-left">
                   <p className="font-medium text-card-foreground">Ver Todos los Leads</p>
-                  <p className="text-xs text-muted-foreground">{stats?.activeLeads || 0} leads activos</p>
+                  <p className="text-xs text-muted-foreground">{overview?.total_leads || 0} leads totales</p>
                 </div>
               </div>
             </Button>
@@ -284,13 +285,13 @@ export default function Dashboard() {
             <Button
               variant="outline"
               className="w-full justify-start h-auto p-4 hover:bg-green-500/5 hover:border-green-500/20 group"
-              onClick={() => navigate('/workflows')}
+              onClick={() => navigate('/stats')}
             >
               <div className="flex items-center space-x-3">
-                <GitBranch className="h-5 w-5 text-green-600 group-hover:text-green-500" />
+                <BarChart3 className="h-5 w-5 text-green-600 group-hover:text-green-500" />
                 <div className="text-left">
-                  <p className="font-medium text-card-foreground">Gestionar Workflows</p>
-                  <p className="text-xs text-muted-foreground">{stats?.activeWorkflows || 0} workflows activos</p>
+                  <p className="font-medium text-card-foreground">Ver Estadísticas</p>
+                  <p className="text-xs text-muted-foreground">Análisis detallado por marca</p>
                 </div>
               </div>
             </Button>
@@ -298,32 +299,30 @@ export default function Dashboard() {
             <Button
               variant="outline"
               className="w-full justify-start h-auto p-4 hover:bg-blue-500/5 hover:border-blue-500/20 group"
-              onClick={() => navigate('/analytics')}
+              onClick={() => navigate('/workflows')}
             >
               <div className="flex items-center space-x-3">
-                <BarChart3 className="h-5 w-5 text-blue-600 group-hover:text-blue-500" />
+                <GitBranch className="h-5 w-5 text-blue-600 group-hover:text-blue-500" />
                 <div className="text-left">
-                  <p className="font-medium text-card-foreground">Ver Analytics</p>
-                  <p className="text-xs text-muted-foreground">Análisis completo</p>
+                  <p className="font-medium text-card-foreground">Gestionar Workflows</p>
+                  <p className="text-xs text-muted-foreground">Workflows de n8n</p>
                 </div>
               </div>
             </Button>
 
-            {stats && stats.pendingErrors > 0 && (
-              <Button
-                variant="outline"
-                className="w-full justify-start h-auto p-4 hover:bg-red-500/5 hover:border-red-500/20 group"
-                onClick={() => navigate('/errors')}
-              >
-                <div className="flex items-center space-x-3">
-                  <AlertTriangle className="h-5 w-5 text-red-600 group-hover:text-red-500" />
-                  <div className="text-left">
-                    <p className="font-medium text-card-foreground">Resolver Errores</p>
-                    <p className="text-xs text-muted-foreground">{stats.pendingErrors} errores pendientes</p>
-                  </div>
+            <Button
+              variant="outline"
+              className="w-full justify-start h-auto p-4 hover:bg-orange-500/5 hover:border-orange-500/20 group"
+              onClick={() => navigate('/errors')}
+            >
+              <div className="flex items-center space-x-3">
+                <AlertTriangle className="h-5 w-5 text-orange-600 group-hover:text-orange-500" />
+                <div className="text-left">
+                  <p className="font-medium text-card-foreground">Monitor de Errores</p>
+                  <p className="text-xs text-muted-foreground">Ver errores de workflows</p>
                 </div>
-              </Button>
-            )}
+              </div>
+            </Button>
           </div>
         </Card>
       </div>

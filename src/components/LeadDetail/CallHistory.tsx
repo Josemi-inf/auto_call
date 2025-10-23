@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,10 @@ import {
   FileText,
   Download,
   Clock,
-  User
+  User,
+  Play,
+  Pause,
+  Volume2
 } from "lucide-react";
 
 interface CallHistoryProps {
@@ -38,11 +41,110 @@ function formatDuration(seconds: number): string {
 export function CallHistory({ leadId, brandDealershipId }: CallHistoryProps) {
   const [expandedCall, setExpandedCall] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [playingCallId, setPlayingCallId] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const { data: calls, isLoading } = useQuery({
     queryKey: ["calls", leadId, brandDealershipId],
     queryFn: () => getCallHistory(leadId, brandDealershipId),
   });
+
+  // Cleanup audio when component unmounts
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  const handlePlayRecording = (callId: string, recordingUrl: string) => {
+    // If already playing this recording, toggle pause
+    if (playingCallId === callId && audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+        setIsPlaying(false);
+      } else {
+        audioRef.current.play();
+        setIsPlaying(true);
+      }
+      return;
+    }
+
+    // Stop previous audio if any
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    // Create new audio element
+    const audio = new Audio(recordingUrl);
+    audioRef.current = audio;
+    setPlayingCallId(callId);
+    setCurrentTime(0);
+    setDuration(0);
+
+    // Event listeners
+    audio.addEventListener('loadedmetadata', () => {
+      setDuration(audio.duration);
+    });
+
+    audio.addEventListener('timeupdate', () => {
+      setCurrentTime(audio.currentTime);
+    });
+
+    audio.addEventListener('ended', () => {
+      setIsPlaying(false);
+      setPlayingCallId(null);
+      setCurrentTime(0);
+    });
+
+    audio.addEventListener('error', (e) => {
+      console.error('Error loading audio:', e);
+      alert('Error al cargar la grabación. Verifica que la URL sea válida.');
+      setIsPlaying(false);
+      setPlayingCallId(null);
+    });
+
+    // Start playing
+    audio.play()
+      .then(() => setIsPlaying(true))
+      .catch((error) => {
+        console.error('Error playing audio:', error);
+        alert('Error al reproducir la grabación.');
+      });
+  };
+
+  const handleStopRecording = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setIsPlaying(false);
+      setPlayingCallId(null);
+      setCurrentTime(0);
+    }
+  };
+
+  const handleDownloadRecording = (recordingUrl: string, callId: string) => {
+    // Open in new tab to trigger download
+    const link = document.createElement('a');
+    link.href = recordingUrl;
+    link.download = `grabacion_${callId}.mp3`;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const formatTime = (seconds: number): string => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
 
   if (isLoading) {
     return (
@@ -162,26 +264,61 @@ export function CallHistory({ leadId, brandDealershipId }: CallHistoryProps) {
                       </div>
                     )}
 
-                    <div className="flex items-center space-x-2">
-                      {call.metadata?.recording_url && (
-                        <>
-                          <Button variant="outline" size="sm">
-                            <Headphones className="h-4 w-4 mr-2" />
-                            Escuchar grabación
-                          </Button>
-                          <Button variant="outline" size="sm">
+                    {/* Audio Player */}
+                    {call.metadata?.recording_url && (
+                      <div className="bg-muted/50 p-4 rounded-lg space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <Button
+                              variant={playingCallId === call.llamada_id && isPlaying ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => handlePlayRecording(call.llamada_id, call.metadata.recording_url)}
+                            >
+                              {playingCallId === call.llamada_id && isPlaying ? (
+                                <>
+                                  <Pause className="h-4 w-4 mr-2" />
+                                  Pausar
+                                </>
+                              ) : (
+                                <>
+                                  <Play className="h-4 w-4 mr-2" />
+                                  {playingCallId === call.llamada_id ? 'Reanudar' : 'Reproducir'}
+                                </>
+                              )}
+                            </Button>
+                            {playingCallId === call.llamada_id && (
+                              <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                                <Volume2 className="h-4 w-4" />
+                                <span>{formatTime(currentTime)} / {formatTime(duration)}</span>
+                              </div>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadRecording(call.metadata.recording_url, call.llamada_id)}
+                          >
                             <Download className="h-4 w-4 mr-2" />
                             Descargar
                           </Button>
-                        </>
-                      )}
-                      {call.metadata?.transcription && (
-                        <Button variant="outline" size="sm">
-                          <FileText className="h-4 w-4 mr-2" />
-                          Ver transcripción completa
-                        </Button>
-                      )}
-                    </div>
+                        </div>
+
+                        {/* Progress bar */}
+                        {playingCallId === call.llamada_id && duration > 0 && (
+                          <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+                            <div
+                              className="bg-primary h-full transition-all duration-100"
+                              style={{ width: `${(currentTime / duration) * 100}%` }}
+                            />
+                          </div>
+                        )}
+
+                        <p className="text-xs text-muted-foreground flex items-center space-x-1">
+                          <Headphones className="h-3 w-3" />
+                          <span>Grabación de Retell AI disponible</span>
+                        </p>
+                      </div>
+                    )}
 
                     {/* Technical Details */}
                     <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
@@ -197,10 +334,10 @@ export function CallHistory({ leadId, brandDealershipId }: CallHistoryProps) {
                           <p className="text-xs text-card-foreground">{call.proveedor}</p>
                         </div>
                       )}
-                      {call.costo !== undefined && (
+                      {call.costo !== undefined && call.costo !== null && (
                         <div>
                           <p className="text-xs text-muted-foreground">Costo</p>
-                          <p className="text-xs text-card-foreground">{call.costo.toFixed(4)}€</p>
+                          <p className="text-xs text-card-foreground">{parseFloat(call.costo.toString()).toFixed(4)}€</p>
                         </div>
                       )}
                     </div>

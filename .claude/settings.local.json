@@ -2,7 +2,18 @@
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(curl:*)",
+      "Bash(timeout /t 3)",
+      "Bash(node check-brands-dealers.js:*)",
+      "Bash(del \"c:\\Users\\Josemi IA\\Documents\\Josemi\\IA_Docs\\Apps\\n8n-lead-sync\\scripts\\insert-sample-data.sql\")",
+      "Bash(rm:*)",
+      "Bash(node insert-sample-data.js:*)",
+      "Bash(node check-lcm-structure.js:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npm install:*)",
+      "Bash(node check-table-structure.js:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []
