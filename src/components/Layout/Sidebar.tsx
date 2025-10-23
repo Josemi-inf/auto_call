@@ -27,7 +27,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="flex h-16 items-center px-6 border-b border-sidebar-border">
         <div className="flex items-center space-x-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden bg-white p-1">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg overflow-hidden">
             <img
               src={logoImage}
               alt="Auto Call Logo"
