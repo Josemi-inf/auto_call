@@ -34,6 +34,8 @@ export const pool = new Pool({
   ssl: process.env.DB_SSL === 'true' ? {
     rejectUnauthorized: false
   } : false,
+  // Explicitly set search_path to public schema
+  options: '-c search_path=public',
   max: 20, // Maximum number of clients in the pool
   idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
   connectionTimeoutMillis: 30000, // Return an error after 30 seconds if connection could not be established
@@ -65,6 +67,26 @@ export const testConnection = async () => {
     console.log('✅ Database connected successfully');
     console.log('📅 Server time:', result.rows[0].now);
     console.log('🐘 PostgreSQL version:', result.rows[0].version.split(',')[0]);
+
+    // Verify we're in the correct database and schema
+    const dbCheck = await client.query('SELECT current_database(), current_schema()');
+    console.log('📂 Current database:', dbCheck.rows[0].current_database);
+    console.log('📁 Current schema:', dbCheck.rows[0].current_schema);
+
+    // Test that critical tables exist
+    const tablesCheck = await client.query(`
+      SELECT table_name
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+      AND table_name IN ('leads', 'concesionario_marca', 'lead_concesionario_marca')
+      ORDER BY table_name
+    `);
+
+    console.log('📊 Tables found:', tablesCheck.rows.map(r => r.table_name).join(', '));
+
+    if (tablesCheck.rows.length < 3) {
+      console.log('⚠️  WARNING: Some tables are missing!');
+    }
 
     client.release();
     return true;
