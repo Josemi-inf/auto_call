@@ -29,17 +29,12 @@ router.get('/', queryValidation, async (req, res, next) => {
         l.apellidos,
         l.email,
         l.telefono,
-        l.telefono_e164,
         l.estado_actual,
-        l.source,
-        l.campana,
         l.ciudad,
         l.cp as codigo_postal,
         l.provincia,
-        l.telefono_valido,
-        l.opt_out,
         l.created_at,
-        l.last_contact_at,
+        COALESCE(l.last_contact_at, l.updated_at, l.created_at) as last_contact_at,
         COALESCE(
           jsonb_agg(
             jsonb_build_object(
@@ -93,17 +88,13 @@ router.get('/', queryValidation, async (req, res, next) => {
         l.apellidos,
         l.email,
         l.telefono,
-        l.telefono_e164,
         l.estado_actual,
-        l.source,
-        l.campana,
         l.ciudad,
         l.cp,
         l.provincia,
-        l.telefono_valido,
-        l.opt_out,
         l.created_at,
-        l.last_contact_at
+        l.last_contact_at,
+        l.updated_at
       ORDER BY l.created_at DESC
       LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
@@ -132,15 +123,10 @@ router.get('/', queryValidation, async (req, res, next) => {
       apellidos: lead.apellidos,
       email: lead.email,
       telefono: lead.telefono,
-      telefono_e164: lead.telefono_e164,
       estado_actual: lead.estado_actual,
-      source: lead.source,
-      campana: lead.campana,
       ciudad: lead.ciudad,
       cp: lead.codigo_postal,
       provincia: lead.provincia,
-      telefono_valido: lead.telefono_valido,
-      opt_out: lead.opt_out,
       created_at: lead.created_at,
       last_contact_at: lead.last_contact_at,
       intentos_compra: lead.intentos_compra,
@@ -221,10 +207,7 @@ router.post('/', createLeadValidation, async (req, res, next) => {
       apellidos,
       email,
       telefono,
-      telefono_e164,
       estado_actual = 'nuevo',
-      source,
-      campana,
       ciudad,
       codigo_postal,
       provincia
@@ -236,24 +219,18 @@ router.post('/', createLeadValidation, async (req, res, next) => {
         apellidos,
         email,
         telefono,
-        telefono_e164,
         estado_actual,
-        source,
-        campana,
         ciudad,
-        codigo_postal,
+        cp,
         provincia
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
       RETURNING *
     `, [
       nombre,
       apellidos,
       email,
       telefono,
-      telefono_e164,
       estado_actual,
-      source,
-      campana,
       ciudad,
       codigo_postal,
       provincia
@@ -639,11 +616,11 @@ router.get('/:id/timeline', async (req, res, next) => {
         l.lead_id as id,
         'lead_creado' as tipo,
         l.created_at as fecha,
-        '🎪 Lead creado desde campaña "' || COALESCE(l.campana, 'Sin campaña') || '"' as descripcion,
+        'Lead creado' as descripcion,
         NULL as marca,
         NULL as concesionario,
         NULL as agente,
-        jsonb_build_object('source', l.source, 'campana', l.campana) as metadata
+        '{}'::jsonb as metadata
       FROM public.leads l
       WHERE l.lead_id = $1
     `, [id]);
