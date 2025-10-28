@@ -196,18 +196,6 @@ export default function LeadDetail() {
               </div>
             </div>
 
-            {/* Campaign Info */}
-            <div className="mt-4 pt-4 border-t border-border">
-              <p className="text-xs text-muted-foreground mb-1">Campaña de origen</p>
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="bg-primary/5">
-                  {lead.campana || "Sin campaña"}
-                </Badge>
-                {lead.source && (
-                  <span className="text-sm text-muted-foreground">• Fuente: {lead.source}</span>
-                )}
-              </div>
-            </div>
           </Card>
 
           {/* Tabs Navigation */}

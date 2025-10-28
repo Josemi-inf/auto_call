@@ -103,6 +103,7 @@ export interface LeadConcesionarioMarca {
   fecha_asignacion?: string;
   fecha_cierre?: string;
   motivo_perdida?: string;
+  source?: string; // web, facebook, instagram, google, referido, llamada, etc.
   prioridad?: number; // 1-5 stars
   combustible_preferido?: string;
   transmision?: string;
@@ -130,12 +131,9 @@ export interface Lead {
   apellidos: string;
   email: string;
   telefono: string;
-  telefono_e164: string;
   estado_actual: string;
   created_at: string;
   last_contact_at: string;
-  source: string;
-  campana: string;
   // Additional fields for enhanced detail view
   ciudad?: string;
   provincia?: string;

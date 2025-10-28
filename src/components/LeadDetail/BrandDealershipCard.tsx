@@ -66,7 +66,7 @@ export function BrandDealershipCard({ intento, leadId, isSelected, onSelect }: B
               </Badge>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-3">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-3">
               <div>
                 <p className="text-xs text-muted-foreground">Modelo de interés</p>
                 <p className="text-sm font-medium text-card-foreground">{intento.modelo}</p>
@@ -75,6 +75,12 @@ export function BrandDealershipCard({ intento, leadId, isSelected, onSelect }: B
                 <p className="text-xs text-muted-foreground">Presupuesto</p>
                 <p className="text-sm font-medium text-card-foreground">
                   {intento.presupuesto_min}€ - {intento.presupuesto_max}€
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Origen/Fuente</p>
+                <p className="text-sm font-medium text-card-foreground">
+                  {intento.source || "No especificado"}
                 </p>
               </div>
               <div>

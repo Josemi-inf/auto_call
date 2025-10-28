@@ -32,7 +32,6 @@ interface LeadDB {
     apellidos: string;
     email: string;
     telefono: string;
-    telefono_e164: string;
     estado_actual: string;
     created_at: string;
     last_contact_at: string;
@@ -43,13 +42,10 @@ export interface LeadRecord {
     nombre: string;
     apellidos: string;
     telefono: string;
-    telefono_e164: string;
     email: string;
     estado_actual: string;
     created_at: Date;
     last_contact_at: Date;
-    source: string;
-    campana: string;
     ciudad: string;
     cp: string;
     provincia: string;
@@ -67,10 +63,7 @@ export const getLeads = async () => {
                 l.apellidos,
                 l.email,
                 l.telefono,
-                l.telefono_e164,
                 l.estado_actual,
-                l.source,
-                l.campana,
                 l.ciudad,
                 l.cp,
                 l.provincia,
@@ -105,10 +98,7 @@ export const getLeads = async () => {
                 l.apellidos,
                 l.email,
                 l.telefono,
-                l.telefono_e164,
                 l.estado_actual,
-                l.source,
-                l.campana,
                 l.ciudad,
                 l.cp,
                 l.provincia,
@@ -129,7 +119,6 @@ export const getLeads = async () => {
                 name: `${lead.nombre} ${lead.apellidos}`.trim(),
                 email: lead.email,
                 phone: lead.telefono,
-                telefono_e164: lead.telefono_e164,
                 status: lead.estado_actual,
                 lastContact: lead.last_contact_at,
                 concesionario: ultimoIntento.concesionario || '',
@@ -137,8 +126,6 @@ export const getLeads = async () => {
                 modelo: ultimoIntento.modelo || '',
                 intentos_compra: intentosCompra,
                 // Campos adicionales de la estructura real
-                source: lead.source,
-                campana: lead.campana,
                 ciudad: lead.ciudad,
                 cp: lead.cp,
                 provincia: lead.provincia,

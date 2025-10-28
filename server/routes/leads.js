@@ -46,7 +46,8 @@ router.get('/', queryValidation, async (req, res, next) => {
               'presupuesto_min', lcm.presupuesto_min,
               'presupuesto_max', lcm.presupuesto_max,
               'fecha_entrada', lcm.fecha_entrada,
-              'notas', lcm.notas
+              'notas', lcm.notas,
+              'source', lcm.source
             ) ORDER BY lcm.fecha_entrada DESC
           ) FILTER (WHERE c.nombre IS NOT NULL),
           '[]'
@@ -172,7 +173,8 @@ router.get('/:id', getLeadByIdValidation, async (req, res, next) => {
               'presupuesto_max', lcm.presupuesto_max,
               'fecha_entrada', lcm.fecha_entrada,
               'notas', lcm.notas,
-              'motivo_perdida', lcm.motivo_perdida
+              'motivo_perdida', lcm.motivo_perdida,
+              'source', lcm.source
             ) ORDER BY lcm.fecha_entrada DESC
           ) FILTER (WHERE c.nombre IS NOT NULL),
           '[]'

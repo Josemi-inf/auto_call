@@ -311,14 +311,6 @@ export default function Leads() {
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-muted-foreground">Fuente</label>
-                  <p className="text-sm text-card-foreground">{selectedLead.source}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Campaña</label>
-                  <p className="text-sm text-card-foreground">{selectedLead.campana}</p>
-                </div>
-                <div>
                   <label className="text-sm font-medium text-muted-foreground">Fecha de creación</label>
                   <p className="text-sm text-card-foreground">
                     {new Date(selectedLead.created_at).toLocaleString()}
