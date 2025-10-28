@@ -29,6 +29,7 @@ router.get('/', queryValidation, async (req, res, next) => {
         l.apellidos,
         l.email,
         l.telefono,
+        l.telefono_e164,
         l.estado_actual,
         l.source,
         l.campana,
