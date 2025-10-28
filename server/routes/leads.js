@@ -538,7 +538,7 @@ router.get('/:id/timeline', async (req, res, next) => {
 
     // Get calls
     const calls = await pool.query(`
-      SELECT
+      SELECT DISTINCT ON (ll.llamada_id)
         ll.llamada_id as id,
         'llamada' as tipo,
         ll.fecha_llamada as fecha,
@@ -558,13 +558,14 @@ router.get('/:id/timeline', async (req, res, next) => {
       LEFT JOIN public.concesionario con ON cm.concesionario_id = con.concesionario_id
       LEFT JOIN public.marca c ON cm.marca_id = c.marca_id
       WHERE ll.lead_id = $1
+      ORDER BY ll.llamada_id, ll.fecha_llamada DESC
     `, [id]);
 
     timeline.push(...calls.rows);
 
     // Get WhatsApp messages
     const whatsapp = await pool.query(`
-      SELECT
+      SELECT DISTINCT ON (lm.id)
         lm.id,
         'whatsapp' as tipo,
         lm.created_at as fecha,
@@ -588,6 +589,7 @@ router.get('/:id/timeline', async (req, res, next) => {
       LEFT JOIN public.concesionario con ON cm.concesionario_id = con.concesionario_id
       LEFT JOIN public.marca c ON cm.marca_id = c.marca_id
       WHERE lm.lead_id = $1
+      ORDER BY lm.id, lm.created_at DESC
     `, [id]);
 
     timeline.push(...whatsapp.rows);

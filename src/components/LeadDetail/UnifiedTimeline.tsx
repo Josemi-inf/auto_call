@@ -124,7 +124,7 @@ export function UnifiedTimeline({ leadId }: UnifiedTimelineProps) {
             const Icon = config?.icon || CalendarIcon;
 
             return (
-              <div key={event.id} className="relative flex items-start space-x-4 pb-2">
+              <div key={`${event.tipo}-${event.id}-${index}`} className="relative flex items-start space-x-4 pb-2">
                 {/* Icon */}
                 <div
                   className={`relative z-10 flex items-center justify-center h-10 w-10 rounded-full ${
