@@ -1,0 +1,70 @@
+[
+ {
+  "column_name": "call_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "lead_concesionario_marca_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "lead_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "exitoso",
+  "data_type": "boolean"
+ },
+ {
+  "column_name": "duracion_ms",
+  "data_type": "integer"
+ },
+ {
+  "column_name": "input_data",
+  "data_type": "jsonb"
+ },
+ {
+  "column_name": "output_data",
+  "data_type": "jsonb"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone"
+ },
+ {
+  "column_name": "agent_action",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "agent_name",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "agente_retell",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "call_retell",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "canal",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "resultado",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "error_message",
+  "data_type": "text"
+ },
+ {
+  "column_name": "telefono",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "agente",
+  "data_type": "character varying"
+ }
+]

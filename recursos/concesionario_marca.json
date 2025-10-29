@@ -1,0 +1,14 @@
+[
+ {
+  "column_name": "concesionario_marca_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "concesionario_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "marca_id",
+  "data_type": "uuid"
+ }
+]

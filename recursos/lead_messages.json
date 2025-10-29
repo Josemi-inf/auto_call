@@ -1,0 +1,66 @@
+[
+ {
+  "column_name": "replied_at",
+  "data_type": "timestamp without time zone"
+ },
+ {
+  "column_name": "lead_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "leido",
+  "data_type": "boolean"
+ },
+ {
+  "column_name": "respondido",
+  "data_type": "boolean"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp without time zone"
+ },
+ {
+  "column_name": "delivered_at",
+  "data_type": "timestamp without time zone"
+ },
+ {
+  "column_name": "read_at",
+  "data_type": "timestamp without time zone"
+ },
+ {
+  "column_name": "id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "enviado",
+  "data_type": "boolean"
+ },
+ {
+  "column_name": "entregado",
+  "data_type": "boolean"
+ },
+ {
+  "column_name": "tipo_mensaje",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "contenido",
+  "data_type": "text"
+ },
+ {
+  "column_name": "media_url",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "error_message",
+  "data_type": "text"
+ },
+ {
+  "column_name": "respuesta_usuario",
+  "data_type": "text"
+ },
+ {
+  "column_name": "whatsapp_message_id",
+  "data_type": "character varying"
+ }
+]

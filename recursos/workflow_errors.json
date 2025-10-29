@@ -1,0 +1,62 @@
+[
+ {
+  "column_name": "error_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "workflow_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "lead_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "leads_afectados",
+  "data_type": "integer"
+ },
+ {
+  "column_name": "detalles",
+  "data_type": "jsonb"
+ },
+ {
+  "column_name": "fecha_error",
+  "data_type": "timestamp with time zone"
+ },
+ {
+  "column_name": "fecha_resolucion",
+  "data_type": "timestamp with time zone"
+ },
+ {
+  "column_name": "created_at",
+  "data_type": "timestamp with time zone"
+ },
+ {
+  "column_name": "updated_at",
+  "data_type": "timestamp with time zone"
+ },
+ {
+  "column_name": "titulo",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "descripcion",
+  "data_type": "text"
+ },
+ {
+  "column_name": "tipo",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "severidad",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "estado",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "resuelto_por",
+  "data_type": "character varying"
+ }
+]

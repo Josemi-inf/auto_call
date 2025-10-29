@@ -1,0 +1,10 @@
+[
+ {
+  "column_name": "marca_id",
+  "data_type": "uuid"
+ },
+ {
+  "column_name": "nombre",
+  "data_type": "character varying"
+ }
+]
