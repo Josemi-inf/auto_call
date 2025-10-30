@@ -34,7 +34,7 @@ export function DateRangePicker({
             id="date"
             variant={"outline"}
             className={cn(
-              "w-[300px] justify-start text-left font-normal",
+              "w-[300px] justify-start text-left font-normal bg-background opacity-100 hover:bg-accent",
               !dateRange && "text-muted-foreground"
             )}
           >
@@ -53,7 +53,7 @@ export function DateRangePicker({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
+        <PopoverContent className="w-auto p-0 bg-white dark:bg-slate-950 opacity-100 shadow-lg border border-border" align="start">
           <Calendar
             initialFocus
             mode="range"
@@ -67,13 +67,14 @@ export function DateRangePicker({
             }}
             numberOfMonths={2}
             locale={es}
+            className="bg-white dark:bg-slate-950"
           />
           {dateRange?.from && (
-            <div className="p-3 border-t">
+            <div className="p-3 border-t bg-white dark:bg-slate-950">
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full"
+                className="w-full bg-white dark:bg-slate-950 hover:bg-accent"
                 onClick={() => {
                   onDateRangeChange(undefined);
                   setOpen(false);

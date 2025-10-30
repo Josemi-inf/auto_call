@@ -23,11 +23,11 @@ import { DateRange } from "react-day-picker";
 export default function Statistics() {
   const [selectedDateRange, setSelectedDateRange] = useState<DateRange | undefined>();
 
-  // Convert DateRange to API format
-  const dateRange = {
-    start_date: selectedDateRange?.from?.toISOString().split('T')[0],
-    end_date: selectedDateRange?.to?.toISOString().split('T')[0],
-  };
+  // Convert DateRange to API format - only include if both dates are selected
+  const dateRange = selectedDateRange?.from && selectedDateRange?.to ? {
+    start_date: selectedDateRange.from.toISOString().split('T')[0],
+    end_date: selectedDateRange.to.toISOString().split('T')[0],
+  } : {};
 
   // Fetch all statistics data
   const { data: overview, isLoading: loadingOverview, error: errorOverview } = useQuery({
@@ -78,30 +78,28 @@ export default function Statistics() {
   return (
     <div className="container mx-auto py-8 px-4 space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground flex items-center space-x-3">
-              <BarChart3 className="h-8 w-8" />
-              <span>Estadísticas de Leads</span>
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Análisis detallado de rendimiento por marca y concesionario
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground flex items-center space-x-3">
+            <BarChart3 className="h-8 w-8" />
+            <span>Estadísticas de Leads</span>
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Análisis detallado de rendimiento por marca y concesionario
+          </p>
+          {selectedDateRange?.from && selectedDateRange?.to && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Mostrando estadísticas del período seleccionado
             </p>
-          </div>
+          )}
         </div>
 
-        {/* Date Range Filter */}
-        <div className="flex items-center gap-4">
+        {/* Date Range Filter - Top Right */}
+        <div className="flex-shrink-0">
           <DateRangePicker
             dateRange={selectedDateRange}
             onDateRangeChange={setSelectedDateRange}
           />
-          {selectedDateRange?.from && selectedDateRange?.to && (
-            <p className="text-sm text-muted-foreground">
-              Mostrando estadísticas del período seleccionado
-            </p>
-          )}
         </div>
       </div>
 
