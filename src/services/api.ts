@@ -326,3 +326,30 @@ export interface RecentActivity {
 export async function getRecentActivity(limit: number = 10): Promise<RecentActivity[]> {
   return maybeFetch<RecentActivity[]>(`/leads/activity/recent?limit=${limit}`, undefined, []);
 }
+
+// Weekly Leads Data for Dashboard Chart
+export interface WeeklyLeadsData {
+  date: string;
+  leads_count: number;
+}
+
+export async function getWeeklyLeadsData(): Promise<WeeklyLeadsData[]> {
+  // Calculate date range for the last 7 days
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - 6); // 7 days including today
+
+  const params = {
+    start_date: startDate.toISOString().split('T')[0],
+    end_date: endDate.toISOString().split('T')[0],
+    interval: 'day' as const,
+  };
+
+  const timelineData = await getStatsTimeline(params);
+
+  // Transform timeline data to match the chart format
+  return timelineData.map((item) => ({
+    date: item.periodo,
+    leads_count: item.total_leads,
+  })).reverse(); // Reverse to show oldest to newest
+}

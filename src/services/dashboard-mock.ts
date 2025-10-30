@@ -1,5 +1,5 @@
 // Re-export stats functions from API
-export { getStatsOverview, getStatsByMarca } from "./api";
+export { getStatsOverview, getStatsByMarca, getWeeklyLeadsData } from "./api";
 
 // Mock service para el dashboard mientras configuramos la conexión correcta
 export interface DashboardStats {
@@ -81,16 +81,6 @@ export const getRecentActivity = async (): Promise<RecentActivity[]> => {
       created_at: new Date(Date.now() - 32 * 60 * 1000)
     }
   ];
-};
-
-export const getWeeklyLeadsData = async () => {
-  await new Promise(resolve => setTimeout(resolve, 600));
-
-  const days = ['2024-01-15', '2024-01-16', '2024-01-17', '2024-01-18', '2024-01-19', '2024-01-20', '2024-01-21'];
-  return days.map((date, index) => ({
-    date,
-    leads_count: Math.floor(Math.random() * 50) + 20 + index * 5
-  }));
 };
 
 export const getWorkflowPerformance = async () => {
