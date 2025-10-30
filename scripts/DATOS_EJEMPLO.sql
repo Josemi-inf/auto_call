@@ -105,11 +105,11 @@ VALUES (
 );
 
 -- =====================================================
--- 2. CREAR LLAMADAS
+-- 2. CREAR LLAMADAS EN CALL_LOGS
 -- =====================================================
 
 -- Llamada 1: Exitosa con Hyundai (hace 4 días)
-INSERT INTO llamadas (
+INSERT INTO call_logs (
   lead_id,
   numero_origen,
   numero_destino,
@@ -142,7 +142,7 @@ VALUES (
 );
 
 -- Llamada 2: Sin respuesta con KIA (hace 3 días)
-INSERT INTO llamadas (
+INSERT INTO call_logs (
   lead_id,
   numero_origen,
   numero_destino,
@@ -169,7 +169,7 @@ VALUES (
 );
 
 -- Llamada 3: Exitosa con KIA (hace 2 días) - seguimiento
-INSERT INTO llamadas (
+INSERT INTO call_logs (
   lead_id,
   numero_origen,
   numero_destino,
@@ -202,7 +202,7 @@ VALUES (
 );
 
 -- Llamada 4: Fallida con CUPRA (hace 1 día)
-INSERT INTO llamadas (
+INSERT INTO call_logs (
   lead_id,
   numero_origen,
   numero_destino,
@@ -229,7 +229,7 @@ VALUES (
 );
 
 -- Llamada 5: Exitosa reciente con Hyundai (hace 6 horas)
-INSERT INTO llamadas (
+INSERT INTO call_logs (
   lead_id,
   numero_origen,
   numero_destino,
@@ -611,9 +611,9 @@ WHERE lead_id = '6ab97b01-c160-42c6-9a63-16308cb0d31b'
 UNION ALL
 
 SELECT
-  'llamadas' as tabla,
+  'call_logs' as tabla,
   COUNT(*) as registros
-FROM llamadas
+FROM call_logs
 WHERE lead_id = '6ab97b01-c160-42c6-9a63-16308cb0d31b'
 
 UNION ALL

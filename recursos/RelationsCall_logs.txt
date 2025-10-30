@@ -1,0 +1,264 @@
+-- =====================================================
+-- SCRIPT: Agregar Relaciones a la tabla call_logs
+-- Fecha: 2025-10-30
+-- Propósito: Establecer Foreign Keys para mantener integridad referencial
+-- =====================================================
+
+-- PASO 1: Verificar relaciones existentes
+SELECT 
+    tc.constraint_name, 
+    tc.table_name, 
+    kcu.column_name, 
+    ccu.table_name AS foreign_table_name,
+    ccu.column_name AS foreign_column_name 
+FROM information_schema.table_constraints AS tc 
+JOIN information_schema.key_column_usage AS kcu
+  ON tc.constraint_name = kcu.constraint_name
+  AND tc.table_schema = kcu.table_schema
+JOIN information_schema.constraint_column_usage AS ccu
+  ON ccu.constraint_name = tc.constraint_name
+WHERE tc.table_name = 'call_logs' 
+  AND tc.constraint_type = 'FOREIGN KEY';
+
+-- =====================================================
+-- PASO 2: Agregar Foreign Keys
+-- =====================================================
+
+-- Relación 1: call_logs -> leads (OBLIGATORIA)
+-- Si el lead se elimina, también se eliminan sus llamadas
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_call_logs_lead_id' 
+        AND table_name = 'call_logs'
+    ) THEN
+        ALTER TABLE call_logs 
+        ADD CONSTRAINT fk_call_logs_lead_id 
+        FOREIGN KEY (lead_id) 
+        REFERENCES leads(lead_id) 
+        ON DELETE CASCADE;
+        
+        RAISE NOTICE 'Foreign Key fk_call_logs_lead_id creada correctamente';
+    ELSE
+        RAISE NOTICE 'Foreign Key fk_call_logs_lead_id ya existe';
+    END IF;
+END $$;
+
+-- Relación 2: call_logs -> lead_concesionario_marca (RECOMENDADA)
+-- Si se elimina la intención de compra, la llamada se mantiene pero se limpia la referencia
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.table_constraints 
+        WHERE constraint_name = 'fk_call_logs_lcm_id' 
+        AND table_name = 'call_logs'
+    ) THEN
+        ALTER TABLE call_logs 
+        ADD CONSTRAINT fk_call_logs_lcm_id 
+        FOREIGN KEY (lead_concesionario_marca_id) 
+        REFERENCES lead_concesionario_marca(lead_concesionario_marca_id) 
+        ON DELETE SET NULL;
+        
+        RAISE NOTICE 'Foreign Key fk_call_logs_lcm_id creada correctamente';
+    ELSE
+        RAISE NOTICE 'Foreign Key fk_call_logs_lcm_id ya existe';
+    END IF;
+END $$;
+
+-- =====================================================
+-- PASO 3: Crear Índices para optimizar consultas
+-- =====================================================
+
+-- Índice en lead_id (para buscar llamadas por lead)
+CREATE INDEX IF NOT EXISTS idx_call_logs_lead_id 
+ON call_logs(lead_id);
+
+-- Índice en lead_concesionario_marca_id
+CREATE INDEX IF NOT EXISTS idx_call_logs_lcm_id 
+ON call_logs(lead_concesionario_marca_id);
+
+-- Índice en created_at (para ordenar por fecha)
+CREATE INDEX IF NOT EXISTS idx_call_logs_created_at 
+ON call_logs(created_at DESC);
+
+-- Índice en resultado (para filtrar por estado de llamada)
+CREATE INDEX IF NOT EXISTS idx_call_logs_resultado 
+ON call_logs(resultado);
+
+-- Índice compuesto para consultas comunes (lead + fecha)
+CREATE INDEX IF NOT EXISTS idx_call_logs_lead_date 
+ON call_logs(lead_id, created_at DESC);
+
+-- Índice para búsquedas por teléfono
+CREATE INDEX IF NOT EXISTS idx_call_logs_telefono 
+ON call_logs(telefono);
+
+-- =====================================================
+-- PASO 4: Agregar columnas recomendadas (OPCIONAL)
+-- =====================================================
+
+-- Agregar columna para número de intento (1, 2, 3)
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'call_logs' 
+        AND column_name = 'intento_numero'
+    ) THEN
+        ALTER TABLE call_logs 
+        ADD COLUMN intento_numero INTEGER DEFAULT 1;
+        
+        COMMENT ON COLUMN call_logs.intento_numero IS 
+        'Número del intento de llamada (1, 2, o 3)';
+        
+        RAISE NOTICE 'Columna intento_numero agregada';
+    ELSE
+        RAISE NOTICE 'Columna intento_numero ya existe';
+    END IF;
+END $$;
+
+-- Agregar columna para relacionar con workflow de n8n
+DO $$ 
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'call_logs' 
+        AND column_name = 'workflow_execution_id'
+    ) THEN
+        ALTER TABLE call_logs 
+        ADD COLUMN workflow_execution_id VARCHAR(100);
+        
+        COMMENT ON COLUMN call_logs.workflow_execution_id IS 
+        'ID de ejecución del workflow de n8n que realizó la llamada';
+        
+        CREATE INDEX IF NOT EXISTS idx_call_logs_workflow_execution 
+        ON call_logs(workflow_execution_id);
+        
+        RAISE NOTICE 'Columna workflow_execution_id agregada';
+    ELSE
+        RAISE NOTICE 'Columna workflow_execution_id ya existe';
+    END IF;
+END $$;
+
+-- =====================================================
+-- PASO 5: Agregar comentarios a la tabla y columnas
+-- =====================================================
+
+COMMENT ON TABLE call_logs IS 
+'Registro completo de todas las llamadas realizadas a los leads';
+
+COMMENT ON COLUMN call_logs.lead_id IS 
+'ID del lead al que se realizó la llamada (FK a leads)';
+
+COMMENT ON COLUMN call_logs.lead_concesionario_marca_id IS 
+'ID de la intención de compra específica (FK a lead_concesionario_marca)';
+
+COMMENT ON COLUMN call_logs.exitoso IS 
+'Indica si la llamada fue exitosa (contacto establecido)';
+
+COMMENT ON COLUMN call_logs.duracion_ms IS 
+'Duración de la llamada en milisegundos';
+
+COMMENT ON COLUMN call_logs.input_data IS 
+'Datos de entrada enviados al sistema de llamadas (JSON)';
+
+COMMENT ON COLUMN call_logs.output_data IS 
+'Datos de salida recibidos del sistema de llamadas (JSON)';
+
+COMMENT ON COLUMN call_logs.agent_action IS 
+'Acción realizada por el agente durante la llamada';
+
+COMMENT ON COLUMN call_logs.resultado IS 
+'Resultado de la llamada: contestada, no_contestada, ocupado, fallida, etc.';
+
+COMMENT ON COLUMN call_logs.error_message IS 
+'Mensaje de error si la llamada falló';
+
+-- =====================================================
+-- PASO 6: Verificación final
+-- =====================================================
+
+-- Ver estructura completa de call_logs
+SELECT 
+    c.column_name,
+    c.data_type,
+    c.character_maximum_length,
+    c.is_nullable,
+    c.column_default,
+    pgd.description
+FROM information_schema.columns c
+LEFT JOIN pg_catalog.pg_statio_all_tables st 
+    ON c.table_schema = st.schemaname 
+    AND c.table_name = st.relname
+LEFT JOIN pg_catalog.pg_description pgd 
+    ON pgd.objoid = st.relid 
+    AND pgd.objsubid = c.ordinal_position
+WHERE c.table_name = 'call_logs'
+ORDER BY c.ordinal_position;
+
+-- Ver todas las Foreign Keys de call_logs
+SELECT 
+    tc.constraint_name,
+    kcu.column_name,
+    ccu.table_name AS references_table,
+    ccu.column_name AS references_column,
+    rc.delete_rule
+FROM information_schema.table_constraints tc
+JOIN information_schema.key_column_usage kcu 
+    ON tc.constraint_name = kcu.constraint_name
+JOIN information_schema.constraint_column_usage ccu 
+    ON tc.constraint_name = ccu.constraint_name
+JOIN information_schema.referential_constraints rc 
+    ON tc.constraint_name = rc.constraint_name
+WHERE tc.table_name = 'call_logs' 
+    AND tc.constraint_type = 'FOREIGN KEY';
+
+-- Ver todos los índices de call_logs
+SELECT 
+    indexname,
+    indexdef
+FROM pg_indexes
+WHERE tablename = 'call_logs'
+ORDER BY indexname;
+
+-- Contar registros actuales
+SELECT 
+    COUNT(*) as total_llamadas,
+    COUNT(DISTINCT lead_id) as leads_unicos,
+    COUNT(CASE WHEN exitoso = true THEN 1 END) as llamadas_exitosas,
+    COUNT(CASE WHEN exitoso = false THEN 1 END) as llamadas_fallidas
+FROM call_logs;
+
+-- =====================================================
+-- NOTAS IMPORTANTES
+-- =====================================================
+
+/*
+✅ RELACIONES CREADAS:
+1. call_logs.lead_id -> leads.lead_id (ON DELETE CASCADE)
+   - Si se elimina un lead, se eliminan todas sus llamadas
+   
+2. call_logs.lead_concesionario_marca_id -> lead_concesionario_marca (ON DELETE SET NULL)
+   - Si se elimina una intención de compra, las llamadas se mantienen pero se limpia la referencia
+
+⚡ ÍNDICES CREADOS (para optimización):
+- idx_call_logs_lead_id: Búsquedas por lead
+- idx_call_logs_lcm_id: Búsquedas por intención de compra
+- idx_call_logs_created_at: Ordenamiento por fecha
+- idx_call_logs_resultado: Filtrado por resultado
+- idx_call_logs_lead_date: Consultas combinadas lead+fecha
+- idx_call_logs_telefono: Búsquedas por teléfono
+
+🔧 COLUMNAS NUEVAS OPCIONALES:
+- intento_numero: Para identificar el 1er, 2do o 3er intento
+- workflow_execution_id: Para rastrear qué workflow de n8n realizó la llamada
+
+📊 INTEGRACIÓN CON N8N:
+Cuando n8n envíe datos a call_logs, asegúrate de incluir:
+- lead_id (OBLIGATORIO)
+- lead_concesionario_marca_id (RECOMENDADO)
+- intento_numero (1, 2, o 3)
+- workflow_execution_id (ID de ejecución de n8n)
+- Todos los demás campos según el resultado de la llamada
+*/

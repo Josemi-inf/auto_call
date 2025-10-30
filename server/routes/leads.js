@@ -353,29 +353,29 @@ router.get('/:id/calls', async (req, res, next) => {
     const { brand_dealership_id } = req.query;
 
     let query = `
-      SELECT DISTINCT ON (ll.llamada_id)
-        ll.llamada_id,
-        ll.lead_id,
-        ll.numero_origen,
-        ll.numero_destino,
-        ll.estado,
-        ll.duracion,
-        ll.costo,
-        ll.latencia,
-        ll.proveedor,
-        ll.call_sid,
-        ll.fecha_llamada,
-        ll.metadata,
-        ll.created_at,
+      SELECT DISTINCT ON (cl.id)
+        cl.id as llamada_id,
+        cl.lead_id,
+        cl.numero_origen,
+        cl.numero_destino,
+        cl.estado,
+        cl.duracion,
+        cl.costo,
+        cl.latencia,
+        cl.proveedor,
+        cl.call_sid,
+        cl.fecha_llamada,
+        cl.metadata,
+        cl.created_at,
         lcm.lead_concesionario_marca_id,
         c.nombre as concesionario,
         m.nombre as marca
-      FROM public.llamadas ll
-      LEFT JOIN public.lead_concesionario_marca lcm ON ll.lead_id = lcm.lead_id
+      FROM public.call_logs cl
+      LEFT JOIN public.lead_concesionario_marca lcm ON cl.lead_id = lcm.lead_id
       LEFT JOIN public.concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
       LEFT JOIN public.concesionario c ON cm.concesionario_id = c.concesionario_id
       LEFT JOIN public.marca m ON cm.marca_id = m.marca_id
-      WHERE ll.lead_id = $1
+      WHERE cl.lead_id = $1
     `;
 
     const params = [id];
@@ -385,7 +385,7 @@ router.get('/:id/calls', async (req, res, next) => {
       params.push(brand_dealership_id);
     }
 
-    query += ` ORDER BY ll.llamada_id, ll.fecha_llamada DESC`;
+    query += ` ORDER BY cl.id, cl.fecha_llamada DESC`;
 
     const result = await pool.query(query, params);
 
@@ -538,27 +538,27 @@ router.get('/:id/timeline', async (req, res, next) => {
 
     // Get calls
     const calls = await pool.query(`
-      SELECT DISTINCT ON (ll.llamada_id)
-        ll.llamada_id as id,
+      SELECT DISTINCT ON (cl.id)
+        cl.id,
         'llamada' as tipo,
-        ll.fecha_llamada as fecha,
+        cl.fecha_llamada as fecha,
         CASE
-          WHEN ll.estado = 'successful' THEN '📞 Llamada exitosa'
-          WHEN ll.estado = 'failed' THEN '📞 Llamada fallida'
-          WHEN ll.estado = 'no_answer' THEN '📞 Llamada sin respuesta'
+          WHEN cl.estado = 'successful' THEN '📞 Llamada exitosa'
+          WHEN cl.estado = 'failed' THEN '📞 Llamada fallida'
+          WHEN cl.estado = 'no_answer' THEN '📞 Llamada sin respuesta'
           ELSE '📞 Llamada'
         END as descripcion,
         c.nombre as marca,
         con.nombre as concesionario,
         NULL as agente,
-        ll.metadata
-      FROM public.llamadas ll
-      LEFT JOIN public.lead_concesionario_marca lcm ON ll.lead_id = lcm.lead_id
+        cl.metadata
+      FROM public.call_logs cl
+      LEFT JOIN public.lead_concesionario_marca lcm ON cl.lead_id = lcm.lead_id
       LEFT JOIN public.concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
       LEFT JOIN public.concesionario con ON cm.concesionario_id = con.concesionario_id
       LEFT JOIN public.marca c ON cm.marca_id = c.marca_id
-      WHERE ll.lead_id = $1
-      ORDER BY ll.llamada_id, ll.fecha_llamada DESC
+      WHERE cl.lead_id = $1
+      ORDER BY cl.id, cl.fecha_llamada DESC
     `, [id]);
 
     timeline.push(...calls.rows);
@@ -664,22 +664,22 @@ router.get('/activity/recent', async (req, res, next) => {
     // Get recent calls
     const recentCalls = await pool.query(`
       SELECT
-        ll.llamada_id as id,
+        cl.id,
         CASE
-          WHEN ll.estado = 'successful' THEN 'call_completed'
-          WHEN ll.estado = 'failed' THEN 'call_failed'
+          WHEN cl.estado = 'successful' THEN 'call_completed'
+          WHEN cl.estado = 'failed' THEN 'call_failed'
           ELSE 'call_attempted'
         END as type,
-        CONCAT('Llamada ', ll.estado, ' - ', l.nombre, ' ', l.apellidos) as message,
-        ll.fecha_llamada as timestamp,
+        CONCAT('Llamada ', cl.estado, ' - ', l.nombre, ' ', l.apellidos) as message,
+        cl.fecha_llamada as timestamp,
         CASE
-          WHEN ll.estado = 'successful' THEN 'success'
-          WHEN ll.estado = 'failed' THEN 'error'
+          WHEN cl.estado = 'successful' THEN 'success'
+          WHEN cl.estado = 'failed' THEN 'error'
           ELSE 'warning'
         END as status
-      FROM public.llamadas ll
-      LEFT JOIN public.leads l ON ll.lead_id = l.lead_id
-      ORDER BY ll.fecha_llamada DESC
+      FROM public.call_logs cl
+      LEFT JOIN public.leads l ON cl.lead_id = l.lead_id
+      ORDER BY cl.fecha_llamada DESC
       LIMIT 5
     `);
 

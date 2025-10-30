@@ -47,7 +47,7 @@ export const getDashboardStats = async (): Promise<DashboardStats> => {
     // Consulta para llamadas de hoy
     const callsQuery = `
       SELECT COUNT(*) as today_calls
-      FROM llamadas
+      FROM call_logs
       WHERE DATE(fecha_llamada) = CURRENT_DATE
     `;
 
@@ -136,7 +136,7 @@ export const getRecentActivity = async (): Promise<RecentActivity[]> => {
       ),
       recent_calls AS (
         SELECT
-          llamada_id as id,
+          id,
           'call_completed' as type,
           'Llamada ' || estado || ' a ' || numero_destino as message,
           created_at,
@@ -144,7 +144,7 @@ export const getRecentActivity = async (): Promise<RecentActivity[]> => {
             WHEN estado = 'successful' THEN 'success'
             ELSE 'warning'
           END as status
-        FROM llamadas
+        FROM call_logs
         WHERE created_at >= NOW() - INTERVAL '24 hours'
       )
       SELECT * FROM (
