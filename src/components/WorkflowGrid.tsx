@@ -473,8 +473,10 @@ export default function WorkflowGrid() {
     );
   }
 
-  // Safety check: ensure workflows is an array
-  const safeWorkflows = Array.isArray(workflows) ? workflows : [];
+  // Safety check: ensure workflows is an array and sort alphabetically
+  const safeWorkflows = Array.isArray(workflows)
+    ? [...workflows].sort((a, b) => a.name.localeCompare(b.name))
+    : [];
   const activeWorkflows = safeWorkflows.filter(w => w.active);
   const inactiveWorkflows = safeWorkflows.filter(w => !w.active);
 
