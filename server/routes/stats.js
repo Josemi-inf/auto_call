@@ -16,7 +16,7 @@ router.get('/overview', async (req, res, next) => {
     let paramIndex = 1;
 
     if (start_date && end_date) {
-      dateFilter = `AND cl.fecha_llamada BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      dateFilter = `AND cl.start_call BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
       params.push(start_date, end_date);
       paramIndex += 2;
     }
@@ -24,20 +24,20 @@ router.get('/overview', async (req, res, next) => {
     const query = `
       SELECT
         COUNT(DISTINCT l.lead_id) as total_leads,
-        COUNT(cl.id) as total_llamadas,
-        COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END) as leads_exitosos,
+        COUNT(cl.call_id) as total_llamadas,
+        COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) as leads_exitosos,
         ROUND(
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
           NULLIF(COUNT(DISTINCT l.lead_id), 0),
           1
         ) as porcentaje_exito,
         COUNT(CASE WHEN lcm.estado = 'no_interesado' THEN 1 END) as leads_no_interesados,
-        COUNT(CASE WHEN cl.estado = 'no_answer' THEN 1 END) as no_conectaron,
-        COUNT(CASE WHEN cl.estado = 'busy' THEN 1 END) as buzon_voz,
-        COUNT(CASE WHEN cl.estado = 'failed' THEN 1 END) as llamadas_fallidas,
-        ROUND(AVG(cl.duracion), 0) as duracion_promedio,
+        COUNT(CASE WHEN cl.resultado = 'no_answer' THEN 1 END) as no_conectaron,
+        COUNT(CASE WHEN cl.resultado = 'busy' THEN 1 END) as buzon_voz,
+        COUNT(CASE WHEN cl.resultado = 'failed' OR cl.exitoso = false THEN 1 END) as llamadas_fallidas,
+        ROUND(AVG(COALESCE(cl.duracion_ms / 1000, 0)), 0) as duracion_promedio,
         ROUND(
-          COUNT(cl.id)::numeric / NULLIF(COUNT(DISTINCT l.lead_id), 0),
+          COUNT(cl.call_id)::numeric / NULLIF(COUNT(DISTINCT l.lead_id), 0),
           2
         ) as intentos_medio
       FROM public.leads l
@@ -66,7 +66,7 @@ router.get('/by-marca', async (req, res, next) => {
     const params = [];
 
     if (start_date && end_date) {
-      dateFilter = `AND cl.fecha_llamada BETWEEN $1 AND $2`;
+      dateFilter = `AND cl.start_call BETWEEN $1 AND $2`;
       params.push(start_date, end_date);
     }
 
@@ -75,22 +75,22 @@ router.get('/by-marca', async (req, res, next) => {
         m.marca_id,
         m.nombre as marca,
         COUNT(DISTINCT l.lead_id) as total_leads,
-        COUNT(cl.id) as total_llamadas,
-        COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END) as leads_exitosos,
+        COUNT(cl.call_id) as total_llamadas,
+        COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) as leads_exitosos,
         ROUND(
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
           NULLIF(COUNT(DISTINCT l.lead_id), 0),
           1
         ) as porcentaje_exito,
         COUNT(CASE WHEN lcm.estado = 'no_interesado' THEN 1 END) as leads_no_interesados,
-        COUNT(CASE WHEN cl.estado = 'no_answer' THEN 1 END) as no_conectaron,
-        COUNT(CASE WHEN cl.estado = 'busy' THEN 1 END) as buzon_voz,
-        COUNT(CASE WHEN cl.estado = 'failed' THEN 1 END) as rellamadas,
+        COUNT(CASE WHEN cl.resultado = 'no_answer' THEN 1 END) as no_conectaron,
+        COUNT(CASE WHEN cl.resultado = 'busy' THEN 1 END) as buzon_voz,
+        COUNT(CASE WHEN cl.resultado = 'failed' OR cl.exitoso = false THEN 1 END) as rellamadas,
         ROUND(
-          COUNT(cl.id)::numeric / NULLIF(COUNT(DISTINCT l.lead_id), 0),
+          COUNT(cl.call_id)::numeric / NULLIF(COUNT(DISTINCT l.lead_id), 0),
           2
         ) as intentos_medio,
-        ROUND(AVG(cl.duracion), 0) as duracion_promedio
+        ROUND(AVG(COALESCE(cl.duracion_ms / 1000, 0)), 0) as duracion_promedio
       FROM public.marca m
       JOIN public.concesionario_marca cm ON m.marca_id = cm.marca_id
       JOIN public.lead_concesionario_marca lcm ON cm.concesionario_marca_id = lcm.concesionario_marca_id
@@ -120,7 +120,7 @@ router.get('/advanced', async (req, res, next) => {
     const params = [];
 
     if (start_date && end_date) {
-      dateFilter = `AND cl.fecha_llamada BETWEEN $1 AND $2`;
+      dateFilter = `AND cl.start_call BETWEEN $1 AND $2`;
       params.push(start_date, end_date);
     }
 
@@ -130,7 +130,7 @@ router.get('/advanced', async (req, res, next) => {
         m.nombre as marca,
         -- Tasas de conversión
         ROUND(
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
           NULLIF(COUNT(DISTINCT l.lead_id), 0),
           1
         ) as tasa_exito,
@@ -140,44 +140,44 @@ router.get('/advanced', async (req, res, next) => {
           1
         ) as tasa_rechazo,
         ROUND(
-          (COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END) -
-           COUNT(CASE WHEN cl.estado = 'no_answer' THEN 1 END))::numeric * 100.0 /
+          (COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) -
+           COUNT(CASE WHEN cl.resultado = 'no_answer' THEN 1 END))::numeric * 100.0 /
           NULLIF(COUNT(DISTINCT l.lead_id), 0),
           1
         ) as tasa_contacto,
         ROUND(
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
-          NULLIF(COUNT(cl.id), 0),
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
+          NULLIF(COUNT(cl.call_id), 0),
           1
         ) as eficiencia_llamadas,
         ROUND(
-          COUNT(cl.id)::numeric / NULLIF(COUNT(DISTINCT l.lead_id), 0),
+          COUNT(cl.call_id)::numeric / NULLIF(COUNT(DISTINCT l.lead_id), 0),
           2
         ) as llamadas_por_lead,
         -- Análisis de contactabilidad
         ROUND(
-          COUNT(CASE WHEN cl.estado = 'no_answer' THEN 1 END)::numeric * 100.0 /
-          NULLIF(COUNT(cl.id), 0),
+          COUNT(CASE WHEN cl.resultado = 'no_answer' THEN 1 END)::numeric * 100.0 /
+          NULLIF(COUNT(cl.call_id), 0),
           1
         ) as porcentaje_no_contesta,
         ROUND(
-          COUNT(CASE WHEN cl.estado = 'busy' THEN 1 END)::numeric * 100.0 /
-          NULLIF(COUNT(cl.id), 0),
+          COUNT(CASE WHEN cl.resultado = 'busy' THEN 1 END)::numeric * 100.0 /
+          NULLIF(COUNT(cl.call_id), 0),
           1
         ) as porcentaje_buzon,
-        (COUNT(CASE WHEN cl.estado = 'no_answer' THEN 1 END) +
-         COUNT(CASE WHEN cl.estado = 'busy' THEN 1 END)) as total_incontactables,
+        (COUNT(CASE WHEN cl.resultado = 'no_answer' THEN 1 END) +
+         COUNT(CASE WHEN cl.resultado = 'busy' THEN 1 END)) as total_incontactables,
         -- Evaluación
         CASE
           WHEN ROUND(
-            COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
+            COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
             NULLIF(COUNT(DISTINCT l.lead_id), 0), 1
           ) >= 10 THEN 'Regular'
           ELSE 'Mejorar'
         END as evaluacion,
         CASE
-          WHEN (COUNT(CASE WHEN cl.estado = 'no_answer' THEN 1 END) +
-                COUNT(CASE WHEN cl.estado = 'busy' THEN 1 END)) >
+          WHEN (COUNT(CASE WHEN cl.resultado = 'no_answer' THEN 1 END) +
+                COUNT(CASE WHEN cl.resultado = 'busy' THEN 1 END)) >
                COUNT(DISTINCT l.lead_id) * 0.5 THEN 'ALTA'
           ELSE 'MEDIA'
         END as prioridad_recontacto
@@ -210,27 +210,27 @@ router.get('/ranking', async (req, res, next) => {
     const params = [limit];
 
     if (start_date && end_date) {
-      dateFilter = `AND cl.fecha_llamada BETWEEN $2 AND $3`;
+      dateFilter = `AND cl.start_call BETWEEN $2 AND $3`;
       params.push(start_date, end_date);
     }
 
     const query = `
       SELECT
         ROW_NUMBER() OVER (ORDER BY
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
           NULLIF(COUNT(DISTINCT l.lead_id), 0) DESC,
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END) DESC
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) DESC
         ) as posicion,
         m.marca_id,
         m.nombre as marca,
         COUNT(DISTINCT l.lead_id) as total_leads,
-        COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END) as leads_exitosos,
+        COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) as leads_exitosos,
         ROUND(
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
           NULLIF(COUNT(DISTINCT l.lead_id), 0),
           1
         ) as tasa_exito,
-        COUNT(cl.id) as total_llamadas
+        COUNT(cl.call_id) as total_llamadas
       FROM public.marca m
       JOIN public.concesionario_marca cm ON m.marca_id = cm.marca_id
       JOIN public.lead_concesionario_marca lcm ON cm.concesionario_marca_id = lcm.concesionario_marca_id
@@ -264,7 +264,7 @@ router.get('/timeline', async (req, res, next) => {
     let paramIndex = 1;
 
     if (start_date && end_date) {
-      dateFilter = `AND cl.fecha_llamada BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
+      dateFilter = `AND cl.start_call BETWEEN $${paramIndex} AND $${paramIndex + 1}`;
       params.push(start_date, end_date);
       paramIndex += 2;
     }
@@ -276,19 +276,19 @@ router.get('/timeline', async (req, res, next) => {
 
     // Determinar el formato de agrupación según el intervalo
     const dateFormat = {
-      day: "DATE(cl.fecha_llamada)",
-      week: "DATE_TRUNC('week', cl.fecha_llamada)",
-      month: "DATE_TRUNC('month', cl.fecha_llamada)"
-    }[interval] || "DATE(cl.fecha_llamada)";
+      day: "DATE(cl.start_call)",
+      week: "DATE_TRUNC('week', cl.start_call)",
+      month: "DATE_TRUNC('month', cl.start_call)"
+    }[interval] || "DATE(cl.start_call)";
 
     const query = `
       SELECT
         ${dateFormat} as periodo,
         COUNT(DISTINCT l.lead_id) as total_leads,
-        COUNT(cl.id) as total_llamadas,
-        COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END) as leads_exitosos,
+        COUNT(cl.call_id) as total_llamadas,
+        COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) as leads_exitosos,
         ROUND(
-          COUNT(DISTINCT CASE WHEN cl.estado = 'successful' THEN l.lead_id END)::numeric * 100.0 /
+          COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
           NULLIF(COUNT(DISTINCT l.lead_id), 0),
           1
         ) as tasa_exito

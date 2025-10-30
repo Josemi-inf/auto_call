@@ -136,7 +136,7 @@ export const getRecentActivity = async (): Promise<RecentActivity[]> => {
       ),
       recent_calls AS (
         SELECT
-          id,
+          call_id as id,
           'call_completed' as type,
           'Llamada ' || estado || ' a ' || numero_destino as message,
           created_at,
