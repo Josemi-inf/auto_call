@@ -56,31 +56,23 @@
   "data_type": "timestamp with time zone"
  },
  {
-  "column_name": "audio_cost",
-  "data_type": "numeric"
+  "column_name": "comercial_nombre",
+  "data_type": "character varying"
  },
  {
-  "column_name": "memory_cost",
-  "data_type": "numeric"
+  "column_name": "event",
+  "data_type": "character varying"
  },
  {
-  "column_name": "start_call",
-  "data_type": "timestamp without time zone"
+  "column_name": "combustible_preferido",
+  "data_type": "character varying"
  },
  {
-  "column_name": "end_call",
-  "data_type": "timestamp without time zone"
+  "column_name": "proxima_accion",
+  "data_type": "text"
  },
  {
-  "column_name": "call_id_retell",
-  "data_type": "numeric"
- },
- {
-  "column_name": "numero_llamada",
-  "data_type": "numeric"
- },
- {
-  "column_name": "marca",
+  "column_name": "source",
   "data_type": "character varying"
  },
  {
@@ -96,11 +88,11 @@
   "data_type": "character varying"
  },
  {
-  "column_name": "concesionario",
-  "data_type": "character varying"
+  "column_name": "notas",
+  "data_type": "text"
  },
  {
-  "column_name": "source",
+  "column_name": "marca",
   "data_type": "character varying"
  },
  {
@@ -124,31 +116,7 @@
   "data_type": "character varying"
  },
  {
-  "column_name": "event",
+  "column_name": "concesionario",
   "data_type": "character varying"
- },
- {
-  "column_name": "combustible_preferido",
-  "data_type": "character varying"
- },
- {
-  "column_name": "proxima_accion",
-  "data_type": "text"
- },
- {
-  "column_name": "url_llamada",
-  "data_type": "character varying"
- },
- {
-  "column_name": "comercial_nombre",
-  "data_type": "character varying"
- },
- {
-  "column_name": "transcripccion",
-  "data_type": "text"
- },
- {
-  "column_name": "notas",
-  "data_type": "text"
  }
 ]
