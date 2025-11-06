@@ -32,6 +32,54 @@
   "data_type": "timestamp with time zone"
  },
  {
+  "column_name": "start_call",
+  "data_type": "timestamp without time zone"
+ },
+ {
+  "column_name": "end_call",
+  "data_type": "timestamp without time zone"
+ },
+ {
+  "column_name": "call_id_retell",
+  "data_type": "numeric"
+ },
+ {
+  "column_name": "numero_llamada",
+  "data_type": "numeric"
+ },
+ {
+  "column_name": "audio_cost",
+  "data_type": "numeric"
+ },
+ {
+  "column_name": "memory_cost",
+  "data_type": "numeric"
+ },
+ {
+  "column_name": "intento_numero",
+  "data_type": "integer"
+ },
+ {
+  "column_name": "canal",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "resultado",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "telefono",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "workflow_execution_id",
+  "data_type": "character varying"
+ },
+ {
+  "column_name": "agente",
+  "data_type": "character varying"
+ },
+ {
   "column_name": "agent_action",
   "data_type": "character varying"
  },
@@ -48,23 +96,15 @@
   "data_type": "character varying"
  },
  {
-  "column_name": "canal",
+  "column_name": "url_llamada",
   "data_type": "character varying"
  },
  {
-  "column_name": "resultado",
-  "data_type": "character varying"
+  "column_name": "transcripccion",
+  "data_type": "text"
  },
  {
   "column_name": "error_message",
   "data_type": "text"
- },
- {
-  "column_name": "telefono",
-  "data_type": "character varying"
- },
- {
-  "column_name": "agente",
-  "data_type": "character varying"
  }
 ]
