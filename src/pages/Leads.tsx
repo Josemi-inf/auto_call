@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { getLeads } from "@/services/api";
@@ -9,99 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Phone,
-  Mail,
-  MessageSquare,
-  Calendar,
   Search,
-  Filter,
-  User,
-  Car,
-  Building,
-  ExternalLink
+  Users,
+  UserCheck,
+  TrendingUp,
+  Eye,
+  Star,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
-
-// Datos obtenidos desde la API (con fallback a mocks en services)
-/* const mockLeads = [
-  {
-    id: 1,
-    name: "María González",
-    email: "maria.gonzalez@email.com",
-    phone: "+34 612 345 678",
-    concesionario: "Toyota Madrid Norte",
-    marca: "Toyota",
-    modelo: "Corolla Hybrid",
-    status: "nuevo",
-    lastContact: "2024-01-15T10:30:00Z",
-    messages: [
-      {
-        id: 1,
-        type: "whatsapp",
-        content: "Hola, me interesa el Toyota Corolla Hybrid. ¿Podrían enviarme más información?",
-        timestamp: "2024-01-15T10:30:00Z",
-        sender: "lead"
-      },
-      {
-        id: 2,
-        type: "system",
-        content: "Mensaje automático enviado con información del vehículo",
-        timestamp: "2024-01-15T10:32:00Z",
-        sender: "system"
-      }
-    ],
-    actions: [
-      { type: "created", date: "2024-01-15T10:30:00Z", description: "Lead creado desde formulario web" },
-      { type: "message", date: "2024-01-15T10:32:00Z", description: "Mensaje automático enviado" }
-    ]
-  },
-  {
-    id: 2,
-    name: "Carlos Ruiz",
-    email: "carlos.ruiz@email.com",
-    phone: "+34 687 654 321",
-    concesionario: "Honda Centro",
-    marca: "Honda",
-    modelo: "Civic Type R",
-    status: "contactado",
-    lastContact: "2024-01-14T15:45:00Z",
-    messages: [
-      {
-        id: 1,
-        type: "call",
-        content: "Llamada realizada - Interesado en financiación",
-        timestamp: "2024-01-14T15:45:00Z",
-        sender: "agent"
-      }
-    ],
-    actions: [
-      { type: "created", date: "2024-01-14T09:15:00Z", description: "Lead creado desde campaña Facebook" },
-      { type: "call", date: "2024-01-14T15:45:00Z", description: "Primera llamada realizada" }
-    ]
-  },
-  {
-    id: 3,
-    name: "Ana Martín",
-    email: "ana.martin@email.com",
-    phone: "+34 645 987 123",
-    concesionario: "BMW Premium",
-    marca: "BMW",
-    modelo: "X3 xDrive",
-    status: "convertido",
-    lastContact: "2024-01-13T11:20:00Z",
-    messages: [
-      {
-        id: 1,
-        type: "email",
-        content: "Oferta personalizada enviada",
-        timestamp: "2024-01-13T11:20:00Z",
-        sender: "agent"
-      }
-    ],
-    actions: [
-      { type: "created", date: "2024-01-10T14:30:00Z", description: "Lead creado desde landing page" },
-      { type: "converted", date: "2024-01-13T11:20:00Z", description: "Venta cerrada" }
-    ]
-  }
-]; */
 
 const statusColors = {
   "nuevo": "bg-primary text-primary-foreground",
@@ -110,10 +26,16 @@ const statusColors = {
   "perdido": "bg-error text-error-foreground"
 };
 
+const statusLabels = {
+  "nuevo": "Nuevo",
+  "en_seguimiento": "En Seguimiento",
+  "convertido": "Convertido",
+  "perdido": "Perdido"
+};
+
 export default function Leads() {
   const navigate = useNavigate();
-  const { data: leads } = useQuery({ queryKey: ["leads"], queryFn: getLeads });
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const { data: leads, isLoading } = useQuery({ queryKey: ["leads"], queryFn: getLeads });
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const leadsPerPage = 10;
@@ -127,6 +49,29 @@ export default function Leads() {
            lead.marca?.toLowerCase().includes(searchTermLower);
   });
 
+  // Calcular estadísticas
+  const stats = useMemo(() => {
+    const total = leads?.length || 0;
+    const activos = leads?.filter(l => l.estado_actual === 'nuevo' || l.estado_actual === 'en_seguimiento').length || 0;
+    const convertidos = leads?.filter(l => l.estado_actual === 'convertido').length || 0;
+    const perdidos = leads?.filter(l => l.estado_actual === 'perdido').length || 0;
+
+    // Calcular calidad media (si existe lead_score)
+    const leadsConScore = leads?.filter(l => l.lead_score !== undefined && l.lead_score !== null) || [];
+    const calidadMedia = leadsConScore.length > 0
+      ? leadsConScore.reduce((sum, l) => sum + (l.lead_score || 0), 0) / leadsConScore.length
+      : 0;
+
+    return {
+      total,
+      activos,
+      convertidos,
+      perdidos,
+      calidadMedia: calidadMedia.toFixed(1),
+      tasaConversion: total > 0 ? ((convertidos / total) * 100).toFixed(1) : '0'
+    };
+  }, [leads]);
+
   // Calcular paginación
   const totalPages = Math.ceil(filteredLeads.length / leadsPerPage);
   const startIndex = (currentPage - 1) * leadsPerPage;
@@ -138,70 +83,231 @@ export default function Leads() {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  // Seleccionar el primer lead de la página actual si no hay ninguno seleccionado
-  useEffect(() => {
-    if (paginatedLeads.length > 0 && !selectedLead) {
-      setSelectedLead(paginatedLeads[0]);
-    }
-  }, [paginatedLeads, selectedLead]);
+  const statsData = [
+    {
+      name: "Total Leads",
+      value: stats.total.toString(),
+      change: `${stats.tasaConversion}% convertidos`,
+      changeType: parseFloat(stats.tasaConversion) >= 20 ? "positive" : "neutral",
+      icon: Users,
+      color: "stats-calls",
+    },
+    {
+      name: "Leads Activos",
+      value: stats.activos.toString(),
+      change: "En seguimiento",
+      changeType: "neutral",
+      icon: UserCheck,
+      color: "stats-success",
+    },
+    {
+      name: "Convertidos",
+      value: stats.convertidos.toString(),
+      change: `${stats.tasaConversion}% tasa éxito`,
+      changeType: "positive",
+      icon: TrendingUp,
+      color: "stats-success",
+    },
+    {
+      name: "Calidad Media",
+      value: stats.calidadMedia,
+      change: "Score promedio",
+      changeType: "neutral",
+      icon: Star,
+      color: "stats-duration",
+    },
+  ];
 
   return (
-    <div className="flex h-screen">
-      {/* Leads List */}
-      <div className="w-80 border-r border-border bg-card flex-shrink-0 relative">
-        <div className="p-6 border-b border-border">
-          <h2 className="text-xl font-semibold text-card-foreground mb-4">Leads</h2>
-          <div className="flex space-x-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar leads..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Button variant="outline" size="icon">
-              <Filter className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+    <div className="p-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-foreground">Gestión de Leads</h1>
+        <p className="text-muted-foreground mt-2">
+          Administra y da seguimiento a todos tus leads
+        </p>
+      </div>
 
-        <div className="overflow-y-auto h-full pb-32">
-          {paginatedLeads.map((lead) => (
-            <div
-              key={lead.lead_id}
-              className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-smooth ${
-                selectedLead?.lead_id === lead.lead_id ? "bg-primary/5 border-r-2 border-r-primary" : ""
-              }`}
-              onClick={() => setSelectedLead(lead)}
-            >
-              <div className="space-y-2">
-                <h3 className="font-medium text-card-foreground">
-                  {lead.nombre} {lead.apellidos}
-                </h3>
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <div className="flex items-center space-x-2">
-                    <Phone className="h-3 w-3" />
-                    <span className="truncate">{lead.telefono}</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Mail className="h-3 w-3" />
-                    <span className="truncate">{lead.email}</span>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {isLoading ? (
+          // Loading skeleton
+          Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="p-6 border border-border shadow-custom-sm animate-pulse">
+              <div className="flex items-center justify-between">
+                <div className="space-y-2">
+                  <div className="h-4 bg-muted rounded w-20"></div>
+                  <div className="h-8 bg-muted rounded w-16"></div>
+                  <div className="h-4 bg-muted rounded w-24"></div>
+                </div>
+                <div className="h-12 w-12 bg-muted rounded-lg"></div>
+              </div>
+            </Card>
+          ))
+        ) : (
+          statsData.map((stat) => (
+            <Card key={stat.name} className="p-6 border border-border shadow-custom-sm hover:shadow-custom-md transition-smooth">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {stat.name}
+                  </p>
+                  <p className="text-2xl font-bold text-card-foreground">
+                    {stat.value}
+                  </p>
+                  <div className="flex items-center mt-2">
+                    <Badge
+                      variant={stat.changeType === "positive" ? "default" : "secondary"}
+                      className="text-xs"
+                    >
+                      {stat.change}
+                    </Badge>
                   </div>
                 </div>
+                <div className={`p-3 rounded-lg bg-primary/10`}>
+                  <stat.icon className={`h-6 w-6 text-primary`} />
+                </div>
               </div>
-            </div>
-          ))}
+            </Card>
+          ))
+        )}
+      </div>
+
+      {/* Search Bar */}
+      <Card className="p-6 border border-border shadow-custom-sm mb-6">
+        <div className="flex items-center space-x-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nombre, email, teléfono, concesionario o marca..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 h-12 text-base"
+            />
+          </div>
+          <Button className="h-12">
+            <Search className="h-4 w-4 mr-2" />
+            Buscar
+          </Button>
+        </div>
+      </Card>
+
+      {/* Leads List */}
+      <Card className="border border-border shadow-custom-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-border bg-muted/50">
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Nombre</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Teléfono</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Concesionario</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Marca/Modelo</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Calidad</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Estado</th>
+                <th className="px-6 py-4 text-center text-sm font-semibold text-card-foreground">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border animate-pulse">
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-32"></div></td>
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-28"></div></td>
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-36"></div></td>
+                    <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-32"></div></td>
+                    <td className="px-6 py-4"><div className="h-6 bg-muted rounded w-12"></div></td>
+                    <td className="px-6 py-4"><div className="h-6 bg-muted rounded w-24"></div></td>
+                    <td className="px-6 py-4"><div className="h-8 bg-muted rounded w-20 mx-auto"></div></td>
+                  </tr>
+                ))
+              ) : paginatedLeads.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-12 text-center">
+                    <Users className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                    <h3 className="text-lg font-medium text-card-foreground mb-2">
+                      No se encontraron leads
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {searchTerm ? "Intenta con otros términos de búsqueda" : "Aún no hay leads en el sistema"}
+                    </p>
+                  </td>
+                </tr>
+              ) : (
+                paginatedLeads.map((lead) => (
+                  <tr
+                    key={lead.lead_id}
+                    className="border-b border-border hover:bg-muted/30 transition-smooth cursor-pointer"
+                    onClick={() => navigate(`/leads/${lead.lead_id}`)}
+                  >
+                    <td className="px-6 py-4">
+                      <p className="font-medium text-card-foreground">
+                        {lead.nombre} {lead.apellidos}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center space-x-2 text-sm text-muted-foreground">
+                        <Phone className="h-4 w-4" />
+                        <span>{lead.telefono}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-card-foreground">
+                        {lead.concesionario || '-'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm">
+                        <p className="font-medium text-card-foreground">{lead.marca || '-'}</p>
+                        <p className="text-muted-foreground">{lead.modelo || '-'}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      {lead.lead_score !== undefined && lead.lead_score !== null ? (
+                        <div className="flex items-center space-x-1">
+                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
+                          <span className="text-sm font-medium text-card-foreground">
+                            {lead.lead_score}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge className={`${statusColors[lead.estado_actual as keyof typeof statusColors]}`}>
+                        {statusLabels[lead.estado_actual as keyof typeof statusLabels] || lead.estado_actual}
+                      </Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center justify-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/leads/${lead.lead_id}`);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
         </div>
 
         {/* Paginación */}
         {totalPages > 1 && (
-          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-card">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">
-                Mostrando {startIndex + 1}-{Math.min(endIndex, filteredLeads.length)} de {filteredLeads.length}
-              </span>
+          <div className="px-6 py-4 border-t border-border bg-muted/20">
+            <div className="flex items-center justify-between">
+              <div className="text-sm text-muted-foreground">
+                Mostrando <span className="font-medium text-card-foreground">{startIndex + 1}</span> a{" "}
+                <span className="font-medium text-card-foreground">{Math.min(endIndex, filteredLeads.length)}</span> de{" "}
+                <span className="font-medium text-card-foreground">{filteredLeads.length}</span> leads
+              </div>
               <div className="flex items-center space-x-2">
                 <Button
                   variant="outline"
@@ -209,11 +315,34 @@ export default function Leads() {
                   onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                   disabled={currentPage === 1}
                 >
+                  <ChevronLeft className="h-4 w-4 mr-1" />
                   Anterior
                 </Button>
-                <span className="text-muted-foreground">
-                  Página {currentPage} de {totalPages}
-                </span>
+                <div className="flex items-center space-x-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                    // Mostrar solo algunas páginas para no saturar
+                    if (
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+                    ) {
+                      return (
+                        <Button
+                          key={page}
+                          variant={currentPage === page ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => setCurrentPage(page)}
+                          className="min-w-[36px]"
+                        >
+                          {page}
+                        </Button>
+                      );
+                    } else if (page === currentPage - 2 || page === currentPage + 2) {
+                      return <span key={page} className="px-2 text-muted-foreground">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -221,172 +350,13 @@ export default function Leads() {
                   disabled={currentPage === totalPages}
                 >
                   Siguiente
+                  <ChevronRight className="h-4 w-4 ml-1" />
                 </Button>
               </div>
             </div>
           </div>
         )}
-      </div>
-
-      {/* Lead Details */}
-      <div className="flex-1 flex flex-col">
-        {selectedLead ? (
-          <>
-            {/* Header */}
-            <div className="p-6 border-b border-border bg-card">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="h-12 w-12 rounded-full bg-gradient-primary flex items-center justify-center">
-                    <User className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <h1 className="text-2xl font-bold text-card-foreground">
-                      {selectedLead.nombre} {selectedLead.apellidos}
-                    </h1>
-                    <span>{selectedLead.email}</span>
-                    <span>{selectedLead.telefono}</span>
-                  </div>
-                </div>
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => navigate(`/leads/${selectedLead.lead_id}`)}
-                  >
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Ver Detalle Completo
-                  </Button>
-                  <Button className="bg-gradient-primary hover:bg-primary-hover">
-                    <Phone className="h-4 w-4 mr-2" />
-                    Llamar
-                  </Button>
-                  <Button variant="outline">
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    WhatsApp
-                  </Button>
-                </div>
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 p-6 overflow-y-auto bg-background">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Lead Info */}
-            <Card className="p-6 border border-border shadow-custom-sm">
-              <h3 className="text-lg font-semibold text-card-foreground mb-4">
-                Información del Lead
-              </h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Estado</label>
-                    <Badge className={`${statusColors[selectedLead.estado_actual as keyof typeof statusColors]}`}>
-                      {selectedLead.estado_actual}
-                    </Badge>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground mb-2 block">Último contacto</label>
-                    <p className="text-sm text-card-foreground">
-                      {new Date(selectedLead.last_contact_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </Card>
-
-            {/* Vehicle & Dealership Info */}
-            <Card className="p-6 border border-border shadow-custom-sm">
-              <h3 className="text-lg font-semibold text-card-foreground mb-4 flex items-center space-x-2">
-                <Car className="h-5 w-5" />
-                <span>Vehículo de Interés</span>
-              </h3>
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Marca</label>
-                    <p className="text-sm text-card-foreground font-medium">{selectedLead.marca}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Modelo</label>
-                    <p className="text-sm text-card-foreground font-medium">{selectedLead.modelo}</p>
-                  </div>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground flex items-center space-x-2">
-                    <Building className="h-4 w-4" />
-                    <span>Concesionario</span>
-                  </label>
-                  <p className="text-sm text-card-foreground font-medium mt-1">{selectedLead.concesionario}</p>
-                </div>
-              </div>
-            </Card>
-
-            {/* Actions History */}
-            <Card className="p-6 border border-border shadow-custom-sm">
-              <h3 className="text-lg font-semibold text-card-foreground mb-4">
-                Historial de Acciones
-              </h3>
-              <div className="space-y-3">
-                {selectedLead.intentos_compra.map((intento, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30">
-                    <div className="mt-1">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-card-foreground">
-                        Intento de compra: {intento.modelo} en {intento.concesionario}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Estado: {intento.estado}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(intento.fecha_entrada).toLocaleString()}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        Presupuesto: {intento.presupuesto_min}€ - {intento.presupuesto_max}€
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* Source Info */}
-            <Card className="p-6 border border-border shadow-custom-sm lg:col-span-2">
-              <h3 className="text-lg font-semibold text-card-foreground mb-4">
-                Información de Origen
-              </h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Fecha de creación</label>
-                  <p className="text-sm text-card-foreground">
-                    {new Date(selectedLead.created_at).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Último contacto</label>
-                  <p className="text-sm text-card-foreground">
-                    {new Date(selectedLead.last_contact_at).toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </div>
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <User className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-lg font-medium text-card-foreground mb-2">
-                Selecciona un lead
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Elige un lead de la lista para ver sus detalles
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
+      </Card>
     </div>
   );
 }
