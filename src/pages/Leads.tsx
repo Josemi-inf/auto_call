@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { getLeads } from "@/services/api";
@@ -115,12 +115,8 @@ export default function Leads() {
   const { data: leads } = useQuery({ queryKey: ["leads"], queryFn: getLeads });
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
-
-  useEffect(() => {
-    if (!selectedLead && leads && leads.length > 0) {
-      setSelectedLead(leads[0]);
-    }
-  }, [leads, selectedLead]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const leadsPerPage = 10;
 
   const filteredLeads = (leads || []).filter(lead => {
     const searchTermLower = searchTerm.toLowerCase();
@@ -131,10 +127,28 @@ export default function Leads() {
            lead.marca?.toLowerCase().includes(searchTermLower);
   });
 
+  // Calcular paginación
+  const totalPages = Math.ceil(filteredLeads.length / leadsPerPage);
+  const startIndex = (currentPage - 1) * leadsPerPage;
+  const endIndex = startIndex + leadsPerPage;
+  const paginatedLeads = filteredLeads.slice(startIndex, endIndex);
+
+  // Resetear a la primera página cuando cambia el filtro de búsqueda
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  // Seleccionar el primer lead de la página actual si no hay ninguno seleccionado
+  useEffect(() => {
+    if (paginatedLeads.length > 0 && !selectedLead) {
+      setSelectedLead(paginatedLeads[0]);
+    }
+  }, [paginatedLeads, selectedLead]);
+
   return (
     <div className="flex h-screen">
       {/* Leads List */}
-      <div className="w-80 border-r border-border bg-card flex-shrink-0">
+      <div className="w-80 border-r border-border bg-card flex-shrink-0 relative">
         <div className="p-6 border-b border-border">
           <h2 className="text-xl font-semibold text-card-foreground mb-4">Leads</h2>
           <div className="flex space-x-2">
@@ -153,8 +167,8 @@ export default function Leads() {
           </div>
         </div>
 
-        <div className="overflow-y-auto h-full pb-20">
-          {filteredLeads.map((lead) => (
+        <div className="overflow-y-auto h-full pb-32">
+          {paginatedLeads.map((lead) => (
             <div
               key={lead.lead_id}
               className={`p-4 border-b border-border cursor-pointer hover:bg-muted/50 transition-smooth ${
@@ -180,6 +194,38 @@ export default function Leads() {
             </div>
           ))}
         </div>
+
+        {/* Paginación */}
+        {totalPages > 1 && (
+          <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border bg-card">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Mostrando {startIndex + 1}-{Math.min(endIndex, filteredLeads.length)} de {filteredLeads.length}
+              </span>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                >
+                  Anterior
+                </Button>
+                <span className="text-muted-foreground">
+                  Página {currentPage} de {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                >
+                  Siguiente
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Lead Details */}
