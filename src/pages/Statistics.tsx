@@ -292,18 +292,18 @@ export default function Statistics() {
                           </Badge>
                         </td>
                         <td className="text-right py-3 px-4">
-                          <Badge className={parseFloat(marca.eficiencia_llamadas.toString()) >= 50 ? "bg-green-500" : "bg-yellow-500"}>
-                            {parseFloat(marca.eficiencia_llamadas.toString()).toFixed(1)}%
+                          <Badge className={parseFloat((marca.eficiencia_llamadas || 0).toString()) >= 50 ? "bg-green-500" : "bg-yellow-500"}>
+                            {parseFloat((marca.eficiencia_llamadas || 0).toString()).toFixed(1)}%
                           </Badge>
                         </td>
                         <td className="text-right py-3 px-4 text-foreground">
-                          {parseFloat(marca.llamadas_por_lead.toString()).toFixed(1)}
+                          {parseFloat((marca.llamadas_por_lead || 0).toString()).toFixed(1)}
                         </td>
                         <td className="text-right py-3 px-4 text-foreground">
-                          {parseFloat(marca.porcentaje_no_contesta.toString()).toFixed(1)}%
+                          {parseFloat((marca.porcentaje_no_contesta || 0).toString()).toFixed(1)}%
                         </td>
                         <td className="text-right py-3 px-4 text-foreground">
-                          {parseFloat(marca.porcentaje_buzon.toString()).toFixed(1)}%
+                          {parseFloat((marca.porcentaje_buzon || 0).toString()).toFixed(1)}%
                         </td>
                         <td className="text-right py-3 px-4 text-foreground">{marca.total_incontactables}</td>
                         <td className="text-center py-3 px-4">
