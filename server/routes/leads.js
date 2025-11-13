@@ -16,7 +16,7 @@ const router = express.Router();
 router.get('/', queryValidation, async (req, res, next) => {
   try {
     const {
-      limit = 100,
+      limit = 10000,
       offset = 0,
       status,
       search
