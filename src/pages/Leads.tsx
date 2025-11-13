@@ -14,7 +14,6 @@ import {
   UserCheck,
   TrendingUp,
   Eye,
-  Star,
   ChevronLeft,
   ChevronRight
 } from "lucide-react";
@@ -31,6 +30,20 @@ const statusLabels = {
   "en_seguimiento": "En Seguimiento",
   "convertido": "Convertido",
   "perdido": "Perdido"
+};
+
+const calidadColors = {
+  "frio": "bg-blue-100 text-blue-700 border-blue-200",
+  "tibio": "bg-yellow-100 text-yellow-700 border-yellow-200",
+  "caliente": "bg-orange-100 text-orange-700 border-orange-200",
+  "muy_caliente": "bg-red-100 text-red-700 border-red-200"
+};
+
+const calidadLabels = {
+  "frio": "Frío",
+  "tibio": "Tibio",
+  "caliente": "Caliente",
+  "muy_caliente": "Muy Caliente"
 };
 
 export default function Leads() {
@@ -113,7 +126,7 @@ export default function Leads() {
       value: stats.calidadMedia,
       change: "Score promedio",
       changeType: "neutral",
-      icon: Star,
+      icon: TrendingUp,
       color: "stats-duration",
     },
   ];
@@ -200,8 +213,8 @@ export default function Leads() {
               <tr className="border-b border-border bg-muted/50">
                 <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Nombre</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Teléfono</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Concesionario</th>
-                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Marca/Modelo</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Marca</th>
+                <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Modelo</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Calidad</th>
                 <th className="px-6 py-4 text-left text-sm font-semibold text-card-foreground">Estado</th>
                 <th className="px-6 py-4 text-center text-sm font-semibold text-card-foreground">Acciones</th>
@@ -215,7 +228,7 @@ export default function Leads() {
                     <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-28"></div></td>
                     <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-36"></div></td>
                     <td className="px-6 py-4"><div className="h-4 bg-muted rounded w-32"></div></td>
-                    <td className="px-6 py-4"><div className="h-6 bg-muted rounded w-12"></div></td>
+                    <td className="px-6 py-4"><div className="h-6 bg-muted rounded w-16"></div></td>
                     <td className="px-6 py-4"><div className="h-6 bg-muted rounded w-24"></div></td>
                     <td className="px-6 py-4"><div className="h-8 bg-muted rounded w-20 mx-auto"></div></td>
                   </tr>
@@ -252,22 +265,25 @@ export default function Leads() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-card-foreground">
-                        {lead.concesionario || '-'}
+                        {lead.marca || '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm">
-                        <p className="font-medium text-card-foreground">{lead.marca || '-'}</p>
-                        <p className="text-muted-foreground">{lead.modelo || '-'}</p>
-                      </div>
+                      <span className="text-sm text-card-foreground">
+                        {lead.modelo || '-'}
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       {lead.lead_score !== undefined && lead.lead_score !== null ? (
-                        <div className="flex items-center space-x-1">
-                          <Star className="h-4 w-4 text-yellow-500 fill-yellow-500" />
-                          <span className="text-sm font-medium text-card-foreground">
+                        <div className="flex items-center justify-center">
+                          <Badge className={`${
+                            lead.lead_score >= 75 ? 'bg-red-100 text-red-700 border-red-200' :
+                            lead.lead_score >= 50 ? 'bg-orange-100 text-orange-700 border-orange-200' :
+                            lead.lead_score >= 25 ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                            'bg-blue-100 text-blue-700 border-blue-200'
+                          } border font-semibold`}>
                             {lead.lead_score}
-                          </span>
+                          </Badge>
                         </div>
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>

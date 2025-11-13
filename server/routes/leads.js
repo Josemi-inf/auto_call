@@ -34,13 +34,15 @@ router.get('/', queryValidation, async (req, res, next) => {
         l.cp as codigo_postal,
         l.provincia,
         l.created_at,
+        l.lead_score,
+        l.calidad_lead,
         COALESCE(l.last_contact_at, l.updated_at, l.created_at) as last_contact_at,
         COALESCE(
           jsonb_agg(
             jsonb_build_object(
               'lead_concesionario_marca_id', lcm.lead_concesionario_marca_id,
-              'concesionario', c.nombre,
-              'marca', m.nombre,
+              'concesionario', lcm.concesionario,
+              'marca', lcm.marca,
               'modelo', lcm.modelo,
               'estado', lcm.estado,
               'presupuesto_min', lcm.presupuesto_min,
@@ -49,14 +51,11 @@ router.get('/', queryValidation, async (req, res, next) => {
               'notas', lcm.notas,
               'source', lcm.source
             ) ORDER BY lcm.fecha_entrada DESC
-          ) FILTER (WHERE c.nombre IS NOT NULL),
+          ) FILTER (WHERE lcm.lead_concesionario_marca_id IS NOT NULL),
           '[]'
         ) as intentos_compra
       FROM public.leads l
       LEFT JOIN public.lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id
-      LEFT JOIN public.concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
-      LEFT JOIN public.concesionario c ON cm.concesionario_id = c.concesionario_id
-      LEFT JOIN public.marca m ON cm.marca_id = m.marca_id
       WHERE l.activo = true AND l.opt_out = false
     `;
 
@@ -94,6 +93,8 @@ router.get('/', queryValidation, async (req, res, next) => {
         l.cp,
         l.provincia,
         l.created_at,
+        l.lead_score,
+        l.calidad_lead,
         l.last_contact_at,
         l.updated_at
       ORDER BY l.created_at DESC
@@ -130,6 +131,8 @@ router.get('/', queryValidation, async (req, res, next) => {
       provincia: lead.provincia,
       created_at: lead.created_at,
       last_contact_at: lead.last_contact_at,
+      lead_score: lead.lead_score,
+      calidad_lead: lead.calidad_lead,
       intentos_compra: lead.intentos_compra,
       // Add computed fields for backward compatibility
       concesionario: lead.intentos_compra[0]?.concesionario || '',
@@ -165,8 +168,8 @@ router.get('/:id', getLeadByIdValidation, async (req, res, next) => {
           jsonb_agg(
             jsonb_build_object(
               'lead_concesionario_marca_id', lcm.lead_concesionario_marca_id,
-              'concesionario', c.nombre,
-              'marca', m.nombre,
+              'concesionario', lcm.concesionario,
+              'marca', lcm.marca,
               'modelo', lcm.modelo,
               'estado', lcm.estado,
               'presupuesto_min', lcm.presupuesto_min,
@@ -176,14 +179,11 @@ router.get('/:id', getLeadByIdValidation, async (req, res, next) => {
               'motivo_perdida', lcm.motivo_perdida,
               'source', lcm.source
             ) ORDER BY lcm.fecha_entrada DESC
-          ) FILTER (WHERE c.nombre IS NOT NULL),
+          ) FILTER (WHERE lcm.lead_concesionario_marca_id IS NOT NULL),
           '[]'
         ) as intentos_compra
       FROM leads l
       LEFT JOIN lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id
-      LEFT JOIN concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
-      LEFT JOIN concesionario c ON cm.concesionario_id = c.concesionario_id
-      LEFT JOIN marca m ON cm.marca_id = m.marca_id
       WHERE l.lead_id = $1
       GROUP BY l.lead_id
     `, [id]);

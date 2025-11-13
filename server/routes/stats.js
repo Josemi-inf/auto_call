@@ -42,7 +42,6 @@ router.get('/overview', async (req, res, next) => {
         ) as intentos_medio
       FROM public.leads l
       LEFT JOIN public.lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id
-      LEFT JOIN public.concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
       LEFT JOIN public.call_logs cl ON l.lead_id = cl.lead_id
       WHERE 1=1 ${dateFilter}
     `;
@@ -72,8 +71,8 @@ router.get('/by-marca', async (req, res, next) => {
 
     const query = `
       SELECT
-        m.marca_id,
-        m.nombre as marca,
+        lcm.marca as marca_id,
+        lcm.marca as marca,
         COUNT(DISTINCT l.lead_id) as total_leads,
         COUNT(cl.call_id) as total_llamadas,
         COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) as leads_exitosos,
@@ -91,13 +90,11 @@ router.get('/by-marca', async (req, res, next) => {
           2
         ) as intentos_medio,
         ROUND(AVG(COALESCE(cl.duracion_ms / 1000, 0)), 0) as duracion_promedio
-      FROM public.marca m
-      JOIN public.concesionario_marca cm ON m.marca_id = cm.marca_id
-      JOIN public.lead_concesionario_marca lcm ON cm.concesionario_marca_id = lcm.concesionario_marca_id
+      FROM public.lead_concesionario_marca lcm
       JOIN public.leads l ON lcm.lead_id = l.lead_id
       LEFT JOIN public.call_logs cl ON l.lead_id = cl.lead_id
-      WHERE 1=1 ${dateFilter}
-      GROUP BY m.marca_id, m.nombre
+      WHERE lcm.marca IS NOT NULL ${dateFilter}
+      GROUP BY lcm.marca
       ORDER BY porcentaje_exito DESC NULLS LAST, total_leads DESC
     `;
 
@@ -126,8 +123,8 @@ router.get('/advanced', async (req, res, next) => {
 
     const query = `
       SELECT
-        m.marca_id,
-        m.nombre as marca,
+        lcm.marca as marca_id,
+        lcm.marca as marca,
         -- Tasas de conversión
         ROUND(
           COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END)::numeric * 100.0 /
@@ -181,13 +178,11 @@ router.get('/advanced', async (req, res, next) => {
                COUNT(DISTINCT l.lead_id) * 0.5 THEN 'ALTA'
           ELSE 'MEDIA'
         END as prioridad_recontacto
-      FROM public.marca m
-      JOIN public.concesionario_marca cm ON m.marca_id = cm.marca_id
-      JOIN public.lead_concesionario_marca lcm ON cm.concesionario_marca_id = lcm.concesionario_marca_id
+      FROM public.lead_concesionario_marca lcm
       JOIN public.leads l ON lcm.lead_id = l.lead_id
       LEFT JOIN public.call_logs cl ON l.lead_id = cl.lead_id
-      WHERE 1=1 ${dateFilter}
-      GROUP BY m.marca_id, m.nombre
+      WHERE lcm.marca IS NOT NULL ${dateFilter}
+      GROUP BY lcm.marca
       ORDER BY tasa_exito DESC NULLS LAST
     `;
 
@@ -221,8 +216,8 @@ router.get('/ranking', async (req, res, next) => {
           NULLIF(COUNT(DISTINCT l.lead_id), 0) DESC,
           COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) DESC
         ) as posicion,
-        m.marca_id,
-        m.nombre as marca,
+        lcm.marca as marca_id,
+        lcm.marca as marca,
         COUNT(DISTINCT l.lead_id) as total_leads,
         COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN l.lead_id END) as leads_exitosos,
         ROUND(
@@ -231,13 +226,11 @@ router.get('/ranking', async (req, res, next) => {
           1
         ) as tasa_exito,
         COUNT(cl.call_id) as total_llamadas
-      FROM public.marca m
-      JOIN public.concesionario_marca cm ON m.marca_id = cm.marca_id
-      JOIN public.lead_concesionario_marca lcm ON cm.concesionario_marca_id = lcm.concesionario_marca_id
+      FROM public.lead_concesionario_marca lcm
       JOIN public.leads l ON lcm.lead_id = l.lead_id
       LEFT JOIN public.call_logs cl ON l.lead_id = cl.lead_id
-      WHERE 1=1 ${dateFilter}
-      GROUP BY m.marca_id, m.nombre
+      WHERE lcm.marca IS NOT NULL ${dateFilter}
+      GROUP BY lcm.marca
       HAVING COUNT(DISTINCT l.lead_id) > 0
       ORDER BY tasa_exito DESC NULLS LAST, leads_exitosos DESC
       LIMIT $1
@@ -270,7 +263,7 @@ router.get('/timeline', async (req, res, next) => {
     }
 
     if (marca_id) {
-      marcaFilter = `AND m.marca_id = $${paramIndex}`;
+      marcaFilter = `AND lcm.marca = $${paramIndex}`;
       params.push(marca_id);
     }
 
@@ -294,8 +287,6 @@ router.get('/timeline', async (req, res, next) => {
         ) as tasa_exito
       FROM public.leads l
       LEFT JOIN public.lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id
-      LEFT JOIN public.concesionario_marca cm ON lcm.concesionario_marca_id = cm.concesionario_marca_id
-      LEFT JOIN public.marca m ON cm.marca_id = m.marca_id
       LEFT JOIN public.call_logs cl ON l.lead_id = cl.lead_id
       WHERE 1=1 ${dateFilter} ${marcaFilter}
       GROUP BY periodo

@@ -20,6 +20,14 @@ import {
 } from "lucide-react";
 import { DateRange } from "react-day-picker";
 
+// Helper function to safely format numbers
+const safeFormatNumber = (value: number | null | undefined, decimals: number = 1): string => {
+  if (value === null || value === undefined || isNaN(Number(value))) {
+    return '0';
+  }
+  return Number(value).toFixed(decimals);
+};
+
 export default function Statistics() {
   const [selectedDateRange, setSelectedDateRange] = useState<DateRange | undefined>();
 
@@ -128,7 +136,7 @@ export default function Statistics() {
                   {overview.total_llamadas || 0}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {parseFloat((overview.intentos_medio || 0).toString()).toFixed(1)} intentos/lead
+                  {safeFormatNumber(overview.intentos_medio || 0)} intentos/lead
                 </p>
               </div>
               <div className="h-12 w-12 rounded-full bg-purple-100 flex items-center justify-center">
@@ -145,7 +153,7 @@ export default function Statistics() {
                   {overview.leads_exitosos || 0}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {parseFloat((overview.porcentaje_exito || 0).toString()).toFixed(1)}% tasa de éxito
+                  {safeFormatNumber(overview.porcentaje_exito || 0)}% tasa de éxito
                 </p>
               </div>
               <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
@@ -159,7 +167,7 @@ export default function Statistics() {
               <div>
                 <p className="text-sm font-medium text-muted-foreground">Duración Promedio</p>
                 <p className="text-3xl font-bold text-foreground mt-2">
-                  {Math.floor(parseFloat((overview.duracion_promedio || 0).toString()) / 60)}:{(parseFloat((overview.duracion_promedio || 0).toString()) % 60).toFixed(0).padStart(2, '0')}
+                  {Math.floor((overview.duracion_promedio || 0) / 60)}:{Math.floor((overview.duracion_promedio || 0) % 60).toString().padStart(2, '0')}
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">minutos</p>
               </div>
@@ -215,20 +223,20 @@ export default function Statistics() {
                     {byMarca.map((marca) => (
                       <tr key={marca.marca_id} className="border-b border-border hover:bg-muted/50">
                         <td className="py-3 px-4 font-medium text-foreground">{marca.marca}</td>
-                        <td className="text-right py-3 px-4 text-foreground">{marca.total_leads}</td>
-                        <td className="text-right py-3 px-4 text-foreground">{marca.total_llamadas}</td>
-                        <td className="text-right py-3 px-4 text-green-600 font-medium">{marca.leads_exitosos}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{marca.total_leads ?? 0}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{marca.total_llamadas ?? 0}</td>
+                        <td className="text-right py-3 px-4 text-green-600 font-medium">{marca.leads_exitosos ?? 0}</td>
                         <td className="text-right py-3 px-4">
-                          <Badge className={parseFloat(marca.porcentaje_exito.toString()) >= 50 ? "bg-green-500" : "bg-yellow-500"}>
-                            {parseFloat(marca.porcentaje_exito.toString()).toFixed(1)}%
+                          <Badge className={(marca.porcentaje_exito ?? 0) >= 50 ? "bg-green-500" : "bg-yellow-500"}>
+                            {safeFormatNumber(marca.porcentaje_exito)}%
                           </Badge>
                         </td>
-                        <td className="text-right py-3 px-4 text-foreground">{marca.leads_no_interesados}</td>
-                        <td className="text-right py-3 px-4 text-foreground">{marca.no_conectaron}</td>
-                        <td className="text-right py-3 px-4 text-foreground">{marca.buzon_voz}</td>
-                        <td className="text-right py-3 px-4 text-foreground">{marca.rellamadas}</td>
-                        <td className="text-right py-3 px-4 text-foreground">{parseFloat(marca.intentos_medio.toString()).toFixed(1)}</td>
-                        <td className="text-right py-3 px-4 text-foreground">{Math.floor(parseFloat(marca.duracion_promedio.toString()) / 60)}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{marca.leads_no_interesados ?? 0}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{marca.no_conectaron ?? 0}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{marca.buzon_voz ?? 0}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{marca.rellamadas ?? 0}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{safeFormatNumber(marca.intentos_medio)}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{Math.floor((marca.duracion_promedio ?? 0) / 60)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -278,34 +286,34 @@ export default function Statistics() {
                         <td className="py-3 px-4 font-medium text-foreground">{marca.marca}</td>
                         <td className="text-right py-3 px-4">
                           <Badge className="bg-green-500">
-                            {parseFloat(marca.tasa_exito.toString()).toFixed(1)}%
+                            {safeFormatNumber(marca.tasa_exito)}%
                           </Badge>
                         </td>
                         <td className="text-right py-3 px-4">
                           <Badge className="bg-red-500">
-                            {parseFloat(marca.tasa_rechazo.toString()).toFixed(1)}%
+                            {safeFormatNumber(marca.tasa_rechazo)}%
                           </Badge>
                         </td>
                         <td className="text-right py-3 px-4">
                           <Badge className="bg-blue-500">
-                            {parseFloat(marca.tasa_contacto.toString()).toFixed(1)}%
+                            {safeFormatNumber(marca.tasa_contacto)}%
                           </Badge>
                         </td>
                         <td className="text-right py-3 px-4">
-                          <Badge className={parseFloat(marca.eficiencia_llamadas.toString()) >= 50 ? "bg-green-500" : "bg-yellow-500"}>
-                            {parseFloat(marca.eficiencia_llamadas.toString()).toFixed(1)}%
+                          <Badge className={(marca.eficiencia_llamadas ?? 0) >= 50 ? "bg-green-500" : "bg-yellow-500"}>
+                            {safeFormatNumber(marca.eficiencia_llamadas)}%
                           </Badge>
                         </td>
                         <td className="text-right py-3 px-4 text-foreground">
-                          {parseFloat(marca.llamadas_por_lead.toString()).toFixed(1)}
+                          {safeFormatNumber(marca.llamadas_por_lead)}
                         </td>
                         <td className="text-right py-3 px-4 text-foreground">
-                          {parseFloat(marca.porcentaje_no_contesta.toString()).toFixed(1)}%
+                          {safeFormatNumber(marca.porcentaje_no_contesta)}%
                         </td>
                         <td className="text-right py-3 px-4 text-foreground">
-                          {parseFloat(marca.porcentaje_buzon.toString()).toFixed(1)}%
+                          {safeFormatNumber(marca.porcentaje_buzon)}%
                         </td>
-                        <td className="text-right py-3 px-4 text-foreground">{marca.total_incontactables}</td>
+                        <td className="text-right py-3 px-4 text-foreground">{marca.total_incontactables ?? 0}</td>
                         <td className="text-center py-3 px-4">
                           <Badge
                             className={
@@ -395,10 +403,10 @@ export default function Statistics() {
                     </div>
                     <div className="text-right">
                       <p className="text-2xl font-bold text-green-600">
-                        {parseFloat(marca.tasa_exito.toString()).toFixed(1)}%
+                        {safeFormatNumber(marca.tasa_exito)}%
                       </p>
                       <p className="text-sm text-muted-foreground">
-                        {marca.leads_exitosos} exitosos
+                        {marca.leads_exitosos ?? 0} exitosos
                       </p>
                     </div>
                   </div>
