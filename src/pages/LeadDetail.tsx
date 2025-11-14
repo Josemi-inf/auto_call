@@ -2,8 +2,9 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getLeadById, updateLead, deleteLead } from "@/services/api";
+import { API_BASE_URL } from "@/services/config";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote, Edit, Ban, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote, Edit, Ban, Trash2, Database } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -195,6 +196,12 @@ export default function LeadDetail() {
             <h1 className="text-xl font-semibold text-card-foreground">
               LEAD #{lead.lead_id.slice(0, 8).toUpperCase()}
             </h1>
+            {!API_BASE_URL && (
+              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950 dark:text-blue-300">
+                <Database className="h-3 w-3 mr-1" />
+                Modo Local
+              </Badge>
+            )}
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

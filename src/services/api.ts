@@ -42,11 +42,26 @@ async function maybeFetch<T>(path: string, init?: RequestInit, fallback?: T): Pr
 
 // Leads
 export async function getLeads(): Promise<Lead[]> {
+  if (!API_BASE_URL) {
+    await delay(DEFAULT_DELAY_MS);
+    // Try to get from localStorage first
+    const cachedLeads = localStorage.getItem('mockLeads');
+    const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+    return leads;
+  }
   const response = await maybeFetch<{ data: Lead[] }>("/leads", undefined, { data: mockLeads });
   return response.data || response as any; // Handle both { data: [] } and [] formats
 }
 
 export async function getLeadById(leadId: string): Promise<Lead> {
+  if (!API_BASE_URL) {
+    await delay(DEFAULT_DELAY_MS);
+    // Try to get from localStorage first
+    const cachedLeads = localStorage.getItem('mockLeads');
+    const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+    const lead = leads.find((l: Lead) => l.lead_id === leadId) || leads[0];
+    return lead;
+  }
   const response = await maybeFetch<{ data: Lead }>(`/leads/${leadId}`, undefined, {
     data: mockLeads.find(l => l.lead_id === leadId) || mockLeads[0]
   });
@@ -358,9 +373,25 @@ export async function getWeeklyLeadsData(): Promise<WeeklyLeadsData[]> {
 export async function updateLead(leadId: string, data: Partial<Lead>): Promise<Lead> {
   if (!API_BASE_URL) {
     await delay(DEFAULT_DELAY_MS);
-    const currentLead = mockLeads.find(l => l.lead_id === leadId) || mockLeads[0];
+
+    // Get cached leads from localStorage
+    const cachedLeads = localStorage.getItem('mockLeads');
+    let leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+
+    // Find and update the lead
+    const leadIndex = leads.findIndex((l: Lead) => l.lead_id === leadId);
+    if (leadIndex !== -1) {
+      leads[leadIndex] = { ...leads[leadIndex], ...data };
+      // Save to localStorage
+      localStorage.setItem('mockLeads', JSON.stringify(leads));
+      console.log('[Mock API] Lead updated and saved to localStorage:', leads[leadIndex]);
+      return leads[leadIndex];
+    }
+
+    const currentLead = leads[0];
     return { ...currentLead, ...data };
   }
+
   const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
@@ -373,6 +404,18 @@ export async function updateLead(leadId: string, data: Partial<Lead>): Promise<L
 export async function deleteLead(leadId: string): Promise<{ success: boolean }> {
   if (!API_BASE_URL) {
     await delay(DEFAULT_DELAY_MS);
+
+    // Get cached leads from localStorage
+    const cachedLeads = localStorage.getItem('mockLeads');
+    let leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+
+    // Remove the lead
+    leads = leads.filter((l: Lead) => l.lead_id !== leadId);
+
+    // Save to localStorage
+    localStorage.setItem('mockLeads', JSON.stringify(leads));
+    console.log('[Mock API] Lead deleted from localStorage');
+
     return { success: true };
   }
   const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
