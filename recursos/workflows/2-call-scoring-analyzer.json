@@ -1,0 +1,158 @@
+{
+  "name": "2 - Call Scoring Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "analyze-call-score",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-call",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "analyze-call-score"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  cl.*,\n  l.lead_score,\n  l.calidad_lead,\n  l.nombre,\n  l.apellidos\nFROM call_logs cl\nINNER JOIN leads l ON cl.lead_id = l.lead_id\nWHERE cl.call_id = '{{ $json.body.call_id }}'"
+      },
+      "id": "get-call-data",
+      "name": "Get Call Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========================================\n// SISTEMA DE SCORING DE LLAMADAS\n// Cada componente de 0-25 puntos = Total 100 puntos\n// ========================================\n\nconst call = $input.first().json;\nlet breakdown = {};\n\nconsole.log('Analizando llamada:', call.call_id);\nconsole.log('Lead:', call.lead_id, '-', call.nombre, call.apellidos);\n\n// ========================================\n// 1. CALL RESPONSE SCORE (0-25 puntos)\n// Evalúa si el lead respondió y cómo\n// ========================================\nlet responseScore = 0;\n\nif (call.exitoso === true || call.exitoso === 't') {\n  // Llamada exitosa - máxima puntuación\n  responseScore = 25;\n  console.log('✓ Llamada exitosa');\n} else {\n  // Llamada no exitosa - puntuar según motivo\n  switch(call.resultado?.toLowerCase()) {\n    case 'no_answer':\n    case 'no_contesta':\n      responseScore = 5;\n      break;\n    case 'busy':\n    case 'ocupado':\n      responseScore = 8;\n      break;\n    case 'rejected':\n    case 'rechazada':\n      responseScore = 0;\n      break;\n    case 'voicemail':\n    case 'buzon':\n      responseScore = 10;\n      break;\n    case 'failed':\n    case 'error':\n      responseScore = 0;\n      break;\n    case 'cancelled':\n    case 'cancelada':\n      responseScore = 3;\n      break;\n    default:\n      responseScore = 5;\n  }\n  console.log('✗ Llamada no exitosa:', call.resultado, '- Score:', responseScore);\n}\n\nbreakdown.response = responseScore;\nbreakdown.response_detail = call.exitoso ? 'successful' : (call.resultado || 'unknown');\n\n// ========================================\n// 2. CALL DURATION SCORE (0-25 puntos)\n// Evalúa la duración de la llamada\n// ========================================\nlet durationScore = 0;\n\nconst duracionMs = parseInt(call.duracion_ms) || 0;\nconst duracionSegundos = duracionMs / 1000;\nconst duracionMinutos = duracionSegundos / 60;\n\nif (duracionMinutos >= 5) {\n  durationScore = 25;  // Conversación larga y detallada\n} else if (duracionMinutos >= 3) {\n  durationScore = 20;  // Buena conversación\n} else if (duracionMinutos >= 2) {\n  durationScore = 15;  // Conversación media\n} else if (duracionMinutos >= 1) {\n  durationScore = 10;  // Conversación corta\n} else if (duracionMinutos >= 0.5) {\n  durationScore = 5;   // Muy breve\n} else {\n  durationScore = 0;   // Casi nada o error\n}\n\nbreakdown.duration = durationScore;\nbreakdown.duration_minutes = Math.round(duracionMinutos * 100) / 100;\n\nconsole.log('Duración:', Math.round(duracionMinutos * 100) / 100, 'min - Score:', durationScore);\n\n// ========================================\n// 3. CALL INTERACTION SCORE (0-25 puntos)\n// Analiza la calidad de la interacción\n// ========================================\nlet interactionScore = 0;\n\n// Intentar parsear output_data si existe\nlet outputData = null;\nif (call.output_data) {\n  try {\n    outputData = typeof call.output_data === 'string' \n      ? JSON.parse(call.output_data) \n      : call.output_data;\n  } catch (e) {\n    console.log('No se pudo parsear output_data');\n  }\n}\n\nif (outputData) {\n  // Indicadores explícitos de interés\n  if (outputData.lead_interested === true || outputData.interested === true) {\n    interactionScore += 10;\n    console.log('+ Lead mostró interés (+10)');\n  }\n  \n  if (outputData.appointment_scheduled === true || outputData.cita_agendada === true) {\n    interactionScore += 10;\n    console.log('+ Cita agendada (+10)');\n  }\n  \n  if (outputData.callback_requested === true || outputData.solicita_callback === true) {\n    interactionScore += 5;\n    console.log('+ Callback solicitado (+5)');\n  }\n  \n  // Análisis de sentimiento del transcript\n  if (outputData.transcript || outputData.transcription) {\n    const transcript = (outputData.transcript || outputData.transcription).toLowerCase();\n    \n    const positiveWords = [\n      'interesado', 'interesada', 'si', 'sí', 'quiero', 'me gusta', \n      'perfecto', 'excelente', 'cuando', 'información', 'precio',\n      'vale', 'ok', 'bueno', 'de acuerdo'\n    ];\n    \n    const negativeWords = [\n      'no', 'nunca', 'no me interesa', 'no quiero', 'ahora no',\n      'más tarde', 'no gracias', 'déjame', 'no puedo'\n    ];\n    \n    const positiveCount = positiveWords.filter(w => transcript.includes(w)).length;\n    const negativeCount = negativeWords.filter(w => transcript.includes(w)).length;\n    \n    if (positiveCount > negativeCount && positiveCount > 0) {\n      const sentimentBonus = Math.min(positiveCount, 5);\n      interactionScore += sentimentBonus;\n      console.log('+ Sentimiento positivo detectado (+' + sentimentBonus + ')');\n    }\n    \n    breakdown.sentiment = {\n      positive_words: positiveCount,\n      negative_words: negativeCount\n    };\n  }\n  \n  // Análisis de intención de compra\n  if (outputData.purchase_intent || outputData.intencion_compra) {\n    const intent = outputData.purchase_intent || outputData.intencion_compra;\n    if (intent === 'high' || intent === 'alta') {\n      interactionScore += 8;\n      console.log('+ Alta intención de compra (+8)');\n    } else if (intent === 'medium' || intent === 'media') {\n      interactionScore += 4;\n      console.log('+ Media intención de compra (+4)');\n    }\n  }\n}\n\n// Cap máximo de 25 puntos\ninteractionScore = Math.min(interactionScore, 25);\nbreakdown.interaction = interactionScore;\n\nconsole.log('Interaction Score:', interactionScore);\n\n// ========================================\n// 4. CALL BEHAVIOR SCORE (0-25 puntos)\n// Evalúa el comportamiento del lead\n// ========================================\nlet behaviorScore = 0;\n\nconst intentoNumero = parseInt(call.intento_numero) || 1;\n\nif (call.exitoso === true || call.exitoso === 't') {\n  // Si contestó exitosamente\n  if (intentoNumero === 1) {\n    behaviorScore = 25;  // Respondió al primer intento - excelente\n  } else if (intentoNumero === 2) {\n    behaviorScore = 20;  // Respondió al segundo intento - muy bien\n  } else if (intentoNumero === 3) {\n    behaviorScore = 15;  // Respondió al tercer intento - bien\n  } else {\n    behaviorScore = 10;  // Respondió tras múltiples intentos - regular\n  }\n  console.log('Respondió al intento', intentoNumero, '- Score:', behaviorScore);\n} else {\n  // No contestó - penalizar por intentos fallidos\n  behaviorScore = Math.max(0, 25 - (intentoNumero * 5));\n  console.log('No contestó - Intento', intentoNumero, '- Score:', behaviorScore);\n}\n\n// Bonificación por respuesta rápida\nif (call.agent_action === 'answered_quickly' || call.respuesta_rapida === true) {\n  behaviorScore = Math.min(behaviorScore + 5, 25);\n  console.log('+ Respondió rápidamente (+5)');\n}\n\nbreakdown.behavior = Math.min(behaviorScore, 25);\nbreakdown.intento_numero = intentoNumero;\n\n// ========================================\n// CALCULAR TOTAL SCORE\n// ========================================\nconst totalScore = responseScore + durationScore + interactionScore + behaviorScore;\n\nconsole.log('=== BREAKDOWN ===');\nconsole.log('Response:', responseScore + '/25');\nconsole.log('Duration:', durationScore + '/25');\nconsole.log('Interaction:', interactionScore + '/25');\nconsole.log('Behavior:', behaviorScore + '/25');\nconsole.log('TOTAL:', totalScore + '/100');\n\n// ========================================\n// CATEGORIZAR LLAMADA\n// ========================================\nlet category = 'baja';\n\nif (totalScore >= 80) {\n  category = 'excelente';\n} else if (totalScore >= 60) {\n  category = 'buena';\n} else if (totalScore >= 40) {\n  category = 'regular';\n} else {\n  category = 'baja';\n}\n\nconsole.log('Categoría:', category);\n\n// ========================================\n// RETORNAR RESULTADO\n// ========================================\nreturn [{\n  json: {\n    lead_id: call.lead_id,\n    call_id: call.call_id,\n    call_response_score: responseScore,\n    call_duration_score: durationScore,\n    call_interaction_score: interactionScore,\n    call_behavior_score: behaviorScore,\n    call_total_score: totalScore,\n    call_score_category: category,\n    call_score_breakdown: breakdown,\n    call_score_updated_at: new Date().toISOString(),\n    lead_info: {\n      nombre: call.nombre,\n      apellidos: call.apellidos,\n      current_lead_score: call.lead_score\n    }\n  }\n}];"
+      },
+      "id": "calculate-call-scores",
+      "name": "Calculate Call Scores",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads \nSET \n  call_response_score = {{ $json.call_response_score }},\n  call_duration_score = {{ $json.call_duration_score }},\n  call_interaction_score = {{ $json.call_interaction_score }},\n  call_behavior_score = {{ $json.call_behavior_score }},\n  call_total_score = {{ $json.call_total_score }},\n  call_score_category = '{{ $json.call_score_category }}',\n  call_score_breakdown = '{{ JSON.stringify($json.call_score_breakdown) }}'::jsonb,\n  call_score_updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "update-call-scores",
+      "name": "Update Call Scores in Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/calculate-lqi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"lead_id\": $json.lead_id\n} }}",
+        "options": {}
+      },
+      "id": "trigger-lqi-update",
+      "name": "Trigger LQI Update",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"call_id\": $json.call_id,\n  \"call_total_score\": $json.call_total_score,\n  \"call_score_category\": $json.call_score_category,\n  \"breakdown\": $json.call_score_breakdown,\n  \"calculated_at\": $json.call_score_updated_at\n} }}",
+        "options": {}
+      },
+      "id": "response-success-call",
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Call Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Call Data": {
+      "main": [
+        [
+          {
+            "node": "Calculate Call Scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Call Scores": {
+      "main": [
+        [
+          {
+            "node": "Update Call Scores in Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Call Scores in Lead": {
+      "main": [
+        [
+          {
+            "node": "Trigger LQI Update",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger LQI Update": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "2",
+  "id": "2",
+  "meta": {
+    "instanceId": "auto_call_call_scoring"
+  },
+  "tags": []
+}

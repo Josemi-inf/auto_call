@@ -1,0 +1,520 @@
+{
+  "name": "4 - Score Based Action Trigger",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "high-priority-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-actions",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "high-priority-lead"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  l.*,\n  lcm.estado as estado_concesionario,\n  lcm.prioridad as prioridad_actual,\n  lcm.comercial_id,\n  lcm.lead_concesionario_marca_id\nFROM leads l\nLEFT JOIN lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id\nWHERE l.lead_id = '{{ $json.body.lead_id }}'\nLIMIT 1"
+      },
+      "id": "get-lead-full-data",
+      "name": "Get Lead Full Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.categoria_lqi }}",
+                    "rightValue": "premium",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "premium"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.categoria_lqi }}",
+                    "rightValue": "alto",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "alto"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.categoria_lqi }}",
+                    "rightValue": "medio",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "medio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": ""
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.categoria_lqi }}",
+                    "rightValue": "bajo",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "bajo"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "switch-by-category",
+      "name": "Switch by LQI Category",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Actualizar prioridad a MÁXIMA\nUPDATE lead_concesionario_marca \nSET \n  prioridad = 5,\n  urgencia = 'alta',\n  updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "action-premium-priority",
+      "name": "Action: Set Maximum Priority",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Obtener comercial senior disponible con menor carga\nSELECT comercial_id, nombre, email\nFROM comerciales\nWHERE \n  nivel = 'senior' \n  AND activo = true\nORDER BY workload ASC\nLIMIT 1"
+      },
+      "id": "get-best-comercial",
+      "name": "Get Best Comercial",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Asignar al mejor comercial disponible\nUPDATE lead_concesionario_marca \nSET \n  comercial_id = '{{ $json.comercial_id }}',\n  updated_at = NOW()\nWHERE lead_id = '{{ $('Action: Set Maximum Priority').item.json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "assign-comercial",
+      "name": "Assign to Best Comercial",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1250, 100],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.SLACK_WEBHOOK_URL || 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"text\": \"🔥 *LEAD PREMIUM DETECTADO*\",\n  \"blocks\": [\n    {\n      \"type\": \"header\",\n      \"text\": {\n        \"type\": \"plain_text\",\n        \"text\": \"🔥 Lead Premium - Acción Inmediata Requerida\"\n      }\n    },\n    {\n      \"type\": \"section\",\n      \"fields\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Lead:*\\n\" + $('Get Lead Full Data').item.json.nombre + \" \" + $('Get Lead Full Data').item.json.apellidos\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*LQI:*\\n\" + $('Get Lead Full Data').item.json.lqi + \"/100\"\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Teléfono:*\\n\" + $('Get Lead Full Data').item.json.telefono\n        },\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"*Categoría:*\\nPREMIUM\"\n        }\n      ]\n    },\n    {\n      \"type\": \"section\",\n      \"text\": {\n        \"type\": \"mrkdwn\",\n        \"text\": \"*Comercial Asignado:*\\n\" + $json.nombre + \" (\" + $json.email + \")\"\n      }\n    },\n    {\n      \"type\": \"divider\"\n    },\n    {\n      \"type\": \"context\",\n      \"elements\": [\n        {\n          \"type\": \"mrkdwn\",\n          \"text\": \"⏰ Contactar en las próximas 2 horas\"\n        }\n      ]\n    }\n  ]\n} }}",
+        "options": {}
+      },
+      "id": "notify-slack-premium",
+      "name": "Notify Slack - Premium",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1450, 100]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Actualizar prioridad a ALTA\nUPDATE lead_concesionario_marca \nSET \n  prioridad = 4,\n  urgencia = 'media',\n  updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "action-high-priority",
+      "name": "Action: Set High Priority",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Programar seguimiento en 48h\nINSERT INTO tareas_seguimiento (\n  lead_id,\n  tipo,\n  descripcion,\n  fecha_programada,\n  prioridad,\n  created_at\n) VALUES (\n  '{{ $json.lead_id }}',\n  'seguimiento',\n  'Lead de alta calidad - Seguimiento prioritario',\n  NOW() + INTERVAL '48 hours',\n  4,\n  NOW()\n) RETURNING *;"
+      },
+      "id": "schedule-followup-48h",
+      "name": "Schedule Follow-up in 48h",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Actualizar prioridad a MEDIA\nUPDATE lead_concesionario_marca \nSET \n  prioridad = 3,\n  urgencia = 'normal',\n  updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "action-medium-priority",
+      "name": "Action: Set Medium Priority",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 500],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Programar seguimiento regular en 1 semana\nINSERT INTO tareas_seguimiento (\n  lead_id,\n  tipo,\n  descripcion,\n  fecha_programada,\n  prioridad,\n  created_at\n) VALUES (\n  '{{ $json.lead_id }}',\n  'seguimiento',\n  'Lead medio - Seguimiento regular',\n  NOW() + INTERVAL '7 days',\n  3,\n  NOW()\n) RETURNING *;"
+      },
+      "id": "schedule-followup-weekly",
+      "name": "Schedule Weekly Follow-up",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 500],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Actualizar prioridad a BAJA\nUPDATE lead_concesionario_marca \nSET \n  prioridad = 2,\n  urgencia = 'baja',\n  canal_preferido = 'whatsapp',\n  updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "action-low-priority",
+      "name": "Action: Set Low Priority",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 700],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Verificar si el lead necesita cambio de estrategia\nconst lead = $input.first().json;\n\n// Obtener estadísticas de llamadas\nconst totalCalls = parseInt(lead.total_calls) || 0;\nconst successfulCalls = parseInt(lead.successful_calls) || 0;\nconst callScore = parseInt(lead.call_total_score) || 0;\n\nlet acciones = [];\n\n// Si ha fallado múltiples intentos por llamada\nif (totalCalls >= 3 && successfulCalls === 0) {\n  acciones.push({\n    tipo: 'cambio_canal',\n    descripcion: 'Cambiar a WhatsApp - No responde llamadas',\n    canal_nuevo: 'whatsapp'\n  });\n}\n\n// Si el call score es muy bajo\nif (callScore < 20 && totalCalls >= 2) {\n  acciones.push({\n    tipo: 'cambio_horario',\n    descripcion: 'Intentar en horario diferente (tarde/noche)',\n    horario_sugerido: 'tarde'\n  });\n}\n\n// Si no hay engagement\nif (lead.engagement_score < 15) {\n  acciones.push({\n    tipo: 'nurturing',\n    descripcion: 'Añadir a campaña de nurturing por email',\n    campana: 'nurturing_bajo_engagement'\n  });\n}\n\nreturn [{\n  json: {\n    lead_id: lead.lead_id,\n    acciones_recomendadas: acciones,\n    total_acciones: acciones.length\n  }\n}];"
+      },
+      "id": "analyze-low-lead",
+      "name": "Analyze Low Priority Lead",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 700]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"categoria_lqi\": \"premium\",\n  \"acciones_ejecutadas\": [\n    \"Prioridad establecida a MÁXIMA\",\n    \"Asignado a comercial senior: \" + $('Assign to Best Comercial').item.json.nombre,\n    \"Notificación enviada a Slack\"\n  ],\n  \"comercial_asignado\": $('Assign to Best Comercial').item.json,\n  \"timestamp\": new Date().toISOString()\n} }}",
+        "options": {}
+      },
+      "id": "response-premium-actions",
+      "name": "Response Premium Actions",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1650, 100]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"categoria_lqi\": \"alto\",\n  \"acciones_ejecutadas\": [\n    \"Prioridad establecida a ALTA\",\n    \"Seguimiento programado en 48h\"\n  ],\n  \"timestamp\": new Date().toISOString()\n} }}",
+        "options": {}
+      },
+      "id": "response-high-actions",
+      "name": "Response High Actions",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"categoria_lqi\": \"medio\",\n  \"acciones_ejecutadas\": [\n    \"Prioridad establecida a MEDIA\",\n    \"Seguimiento programado en 7 días\"\n  ],\n  \"timestamp\": new Date().toISOString()\n} }}",
+        "options": {}
+      },
+      "id": "response-medium-actions",
+      "name": "Response Medium Actions",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"categoria_lqi\": \"bajo\",\n  \"acciones_ejecutadas\": [\n    \"Prioridad establecida a BAJA\",\n    \"Canal preferido cambiado a WhatsApp\",\n    \"Acciones recomendadas analizadas\"\n  ],\n  \"acciones_recomendadas\": $json.acciones_recomendadas,\n  \"timestamp\": new Date().toISOString()\n} }}",
+        "options": {}
+      },
+      "id": "response-low-actions",
+      "name": "Response Low Actions",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 700]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Lead Full Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead Full Data": {
+      "main": [
+        [
+          {
+            "node": "Switch by LQI Category",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch by LQI Category": {
+      "main": [
+        [
+          {
+            "node": "Action: Set Maximum Priority",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action: Set High Priority",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action: Set Medium Priority",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Action: Set Low Priority",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action: Set Maximum Priority": {
+      "main": [
+        [
+          {
+            "node": "Get Best Comercial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Best Comercial": {
+      "main": [
+        [
+          {
+            "node": "Assign to Best Comercial",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assign to Best Comercial": {
+      "main": [
+        [
+          {
+            "node": "Notify Slack - Premium",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Slack - Premium": {
+      "main": [
+        [
+          {
+            "node": "Response Premium Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action: Set High Priority": {
+      "main": [
+        [
+          {
+            "node": "Schedule Follow-up in 48h",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Follow-up in 48h": {
+      "main": [
+        [
+          {
+            "node": "Response High Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action: Set Medium Priority": {
+      "main": [
+        [
+          {
+            "node": "Schedule Weekly Follow-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Weekly Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Response Medium Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Action: Set Low Priority": {
+      "main": [
+        [
+          {
+            "node": "Analyze Low Priority Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Low Priority Lead": {
+      "main": [
+        [
+          {
+            "node": "Response Low Actions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "4",
+  "id": "4",
+  "meta": {
+    "instanceId": "auto_call_actions"
+  },
+  "tags": []
+}

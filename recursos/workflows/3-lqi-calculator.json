@@ -1,0 +1,206 @@
+{
+  "name": "3 - LQI Calculator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calculate-lqi",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger-lqi",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "calculate-lqi"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  l.*,\n  COUNT(DISTINCT lcm.lead_concesionario_marca_id) as intentos_compra,\n  COUNT(DISTINCT cl.call_id) as total_calls,\n  COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN cl.call_id END) as successful_calls,\n  CASE \n    WHEN COUNT(DISTINCT cl.call_id) > 0 THEN\n      (COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN cl.call_id END)::NUMERIC / \n       COUNT(DISTINCT cl.call_id)::NUMERIC * 100)\n    ELSE 0\n  END as tasa_exito_llamadas,\n  COUNT(DISTINCT lm.message_id) as total_messages,\n  MAX(cl.created_at) as ultima_llamada,\n  MAX(lm.created_at) as ultimo_mensaje\nFROM leads l\nLEFT JOIN lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id\nLEFT JOIN call_logs cl ON l.lead_id = cl.lead_id\nLEFT JOIN lead_messages lm ON l.lead_id = lm.lead_id\nWHERE l.lead_id = '{{ $json.body.lead_id }}'\nGROUP BY l.lead_id"
+      },
+      "id": "get-lead-complete-data",
+      "name": "Get Lead Complete Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========================================\n// LEAD QUALITY INDEX (LQI) CALCULATOR\n// Índice combinado de calidad del lead\n// ========================================\n\nconst lead = $input.first().json;\nlet breakdown = {};\n\nconsole.log('Calculando LQI para lead:', lead.lead_id);\nconsole.log('Nombre:', lead.nombre, lead.apellidos);\n\n// ========================================\n// COMPONENTE 1: Lead Score (40% del peso)\n// Puntuación base del lead\n// ========================================\nconst leadScore = parseInt(lead.lead_score) || 50; // Default 50 si no existe\nconst leadScoreComponent = leadScore * 0.4;\n\nbreakdown.lead_score_base = leadScore;\nbreakdown.lead_score_component = Math.round(leadScoreComponent);\n\nconsole.log('Lead Score:', leadScore, '-> Componente:', Math.round(leadScoreComponent));\n\n// ========================================\n// COMPONENTE 2: Call Score (40% del peso)\n// Puntuación de las interacciones telefónicas\n// ========================================\nconst callScore = parseInt(lead.call_total_score) || 0;\nconst callScoreComponent = callScore * 0.4;\n\nbreakdown.call_score_base = callScore;\nbreakdown.call_score_component = Math.round(callScoreComponent);\n\nconsole.log('Call Score:', callScore, '-> Componente:', Math.round(callScoreComponent));\n\n// ========================================\n// COMPONENTE 3: Intentos de Compra (bonus hasta 20 puntos)\n// Más intentos = mayor interés\n// ========================================\nconst intentosCompra = parseInt(lead.intentos_compra) || 0;\nconst intentosBonus = Math.min(intentosCompra * 10, 20);\n\nbreakdown.intentos_compra = intentosCompra;\nbreakdown.intentos_bonus = intentosBonus;\n\nconsole.log('Intentos de compra:', intentosCompra, '-> Bonus:', intentosBonus);\n\n// ========================================\n// COMPONENTE 4: Tasa de Éxito en Llamadas (20% del peso)\n// Qué tan receptivo es el lead\n// ========================================\nconst tasaExito = parseFloat(lead.tasa_exito_llamadas) || 0;\nconst tasaExitoComponent = tasaExito * 0.2;\n\nbreakdown.tasa_exito = Math.round(tasaExito);\nbreakdown.tasa_exito_component = Math.round(tasaExitoComponent);\n\nconsole.log('Tasa de éxito:', Math.round(tasaExito) + '%', '-> Componente:', Math.round(tasaExitoComponent));\n\n// ========================================\n// COMPONENTE 5: Actividad Reciente (bonus hasta 10 puntos)\n// Leads activos recientemente son más valiosos\n// ========================================\nlet actividadBonus = 0;\n\nif (lead.ultima_llamada || lead.ultimo_mensaje) {\n  const ultimaActividad = new Date(\n    Math.max(\n      lead.ultima_llamada ? new Date(lead.ultima_llamada).getTime() : 0,\n      lead.ultimo_mensaje ? new Date(lead.ultimo_mensaje).getTime() : 0\n    )\n  );\n  \n  const diasDesdeActividad = Math.floor((new Date() - ultimaActividad) / (1000 * 60 * 60 * 24));\n  \n  if (diasDesdeActividad <= 1) {\n    actividadBonus = 10;  // Actividad hoy o ayer\n  } else if (diasDesdeActividad <= 3) {\n    actividadBonus = 8;   // Últimos 3 días\n  } else if (diasDesdeActividad <= 7) {\n    actividadBonus = 6;   // Esta semana\n  } else if (diasDesdeActividad <= 14) {\n    actividadBonus = 4;   // Últimas 2 semanas\n  } else if (diasDesdeActividad <= 30) {\n    actividadBonus = 2;   // Este mes\n  }\n  \n  breakdown.dias_desde_actividad = diasDesdeActividad;\n  breakdown.actividad_bonus = actividadBonus;\n  \n  console.log('Días desde última actividad:', diasDesdeActividad, '-> Bonus:', actividadBonus);\n}\n\n// ========================================\n// COMPONENTE 6: Engagement Multi-canal (bonus hasta 10 puntos)\n// Interacciones por múltiples canales = mayor engagement\n// ========================================\nlet engagementBonus = 0;\n\nconst totalCalls = parseInt(lead.total_calls) || 0;\nconst totalMessages = parseInt(lead.total_messages) || 0;\n\nlet canalesActivos = 0;\nif (totalCalls > 0) canalesActivos++;\nif (totalMessages > 0) canalesActivos++;\n\nif (canalesActivos === 2) {\n  // Usa múltiples canales\n  engagementBonus = 10;\n} else if (canalesActivos === 1) {\n  // Solo un canal pero activo\n  if (totalCalls >= 3 || totalMessages >= 5) {\n    engagementBonus = 6;\n  } else {\n    engagementBonus = 3;\n  }\n}\n\nbreakdown.canales_activos = canalesActivos;\nbreakdown.engagement_bonus = engagementBonus;\n\nconsole.log('Canales activos:', canalesActivos, '-> Bonus:', engagementBonus);\n\n// ========================================\n// CALCULAR LQI TOTAL\n// ========================================\nlet lqi = leadScoreComponent + callScoreComponent + intentosBonus + \n          tasaExitoComponent + actividadBonus + engagementBonus;\n\n// Redondear y aplicar límites\nlqi = Math.round(lqi);\nlqi = Math.min(lqi, 100); // Máximo 100\nlqi = Math.max(lqi, 0);   // Mínimo 0\n\nconsole.log('=== CÁLCULO LQI ===');\nconsole.log('Lead Score Component:', Math.round(leadScoreComponent));\nconsole.log('Call Score Component:', Math.round(callScoreComponent));\nconsole.log('Intentos Bonus:', intentosBonus);\nconsole.log('Tasa Éxito Component:', Math.round(tasaExitoComponent));\nconsole.log('Actividad Bonus:', actividadBonus);\nconsole.log('Engagement Bonus:', engagementBonus);\nconsole.log('LQI TOTAL:', lqi);\n\n// ========================================\n// CATEGORIZAR LQI\n// ========================================\nlet categoriaLqi = 'bajo';\nlet recomendacion = '';\nlet prioridad = 3;\n\nif (lqi >= 80) {\n  categoriaLqi = 'premium';\n  recomendacion = 'Lead de máxima calidad. Asignar inmediatamente a comercial senior.';\n  prioridad = 5;\n} else if (lqi >= 65) {\n  categoriaLqi = 'alto';\n  recomendacion = 'Lead de alta calidad. Seguimiento prioritario en 24h.';\n  prioridad = 4;\n} else if (lqi >= 45) {\n  categoriaLqi = 'medio';\n  recomendacion = 'Lead estándar. Seguimiento regular.';\n  prioridad = 3;\n} else if (lqi >= 25) {\n  categoriaLqi = 'bajo';\n  recomendacion = 'Lead de baja calidad. Seguimiento automatizado.';\n  prioridad = 2;\n} else {\n  categoriaLqi = 'muy_bajo';\n  recomendacion = 'Lead muy bajo. Considerar descarte o nurturing a largo plazo.';\n  prioridad = 1;\n}\n\nbreakdown.prioridad_recomendada = prioridad;\nbreakdown.recomendacion = recomendacion;\n\nconsole.log('Categoría LQI:', categoriaLqi);\nconsole.log('Prioridad:', prioridad);\nconsole.log('Recomendación:', recomendacion);\n\n// ========================================\n// ANÁLISIS COMPARATIVO\n// ========================================\n// Comparar con promedios históricos (esto se puede mejorar con datos reales)\nconst promedioLqi = 50; // Este valor se podría obtener de una query\nconst desviacion = lqi - promedioLqi;\n\nbreakdown.comparativa = {\n  vs_promedio: desviacion,\n  mejor_que_promedio: desviacion > 0,\n  percentil_estimado: Math.min(Math.round((lqi / 100) * 100), 100)\n};\n\n// ========================================\n// FACTORES DE MEJORA\n// Sugerir qué mejorar para aumentar el LQI\n// ========================================\nlet factoresMejora = [];\n\nif (leadScore < 60) {\n  factoresMejora.push('Completar información del lead');\n}\nif (callScore < 50) {\n  factoresMejora.push('Mejorar calidad de llamadas');\n}\nif (tasaExito < 30) {\n  factoresMejora.push('Optimizar horarios de contacto');\n}\nif (canalesActivos < 2) {\n  factoresMejora.push('Probar contacto por WhatsApp/Email');\n}\nif (breakdown.dias_desde_actividad > 7) {\n  factoresMejora.push('Reactivar contacto urgente');\n}\n\nbreakdown.factores_mejora = factoresMejora;\n\nif (factoresMejora.length > 0) {\n  console.log('Factores de mejora:', factoresMejora.join(', '));\n}\n\n// ========================================\n// RETORNAR RESULTADO\n// ========================================\nreturn [{\n  json: {\n    lead_id: lead.lead_id,\n    lqi: lqi,\n    categoria_lqi: categoriaLqi,\n    lqi_breakdown: breakdown,\n    prioridad: prioridad,\n    recomendacion: recomendacion,\n    factores_mejora: factoresMejora,\n    calculated_at: new Date().toISOString(),\n    lead_info: {\n      nombre: lead.nombre,\n      apellidos: lead.apellidos,\n      telefono: lead.telefono,\n      estado: lead.estado_actual\n    }\n  }\n}];"
+      },
+      "id": "calculate-lqi",
+      "name": "Calculate LQI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads \nSET \n  lqi = {{ $json.lqi }},\n  categoria_lqi = '{{ $json.categoria_lqi }}',\n  lqi_breakdown = '{{ JSON.stringify($json.lqi_breakdown) }}'::jsonb,\n  updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "update-lqi",
+      "name": "Update LQI in Database",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.lqi }}",
+              "operation": "largerEqual",
+              "value2": 80
+            }
+          ]
+        }
+      },
+      "id": "check-if-premium",
+      "name": "Check if Premium Lead",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/high-priority-lead",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"lead_id\": $json.lead_id,\n  \"lqi\": $json.lqi,\n  \"categoria_lqi\": $json.categoria_lqi,\n  \"prioridad\": $json.prioridad,\n  \"recomendacion\": $json.recomendacion,\n  \"lead_info\": $json.lead_info\n} }}",
+        "options": {}
+      },
+      "id": "trigger-premium-actions",
+      "name": "Trigger Premium Lead Actions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"lqi\": $json.lqi,\n  \"categoria_lqi\": $json.categoria_lqi,\n  \"prioridad\": $json.prioridad,\n  \"recomendacion\": $json.recomendacion,\n  \"factores_mejora\": $json.factores_mejora,\n  \"breakdown\": $json.lqi_breakdown,\n  \"calculated_at\": $json.calculated_at,\n  \"premium_actions_triggered\": true\n} }}",
+        "options": {}
+      },
+      "id": "response-premium",
+      "name": "Response Premium",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1450, 200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"lqi\": $json.lqi,\n  \"categoria_lqi\": $json.categoria_lqi,\n  \"prioridad\": $json.prioridad,\n  \"recomendacion\": $json.recomendacion,\n  \"factores_mejora\": $json.factores_mejora,\n  \"breakdown\": $json.lqi_breakdown,\n  \"calculated_at\": $json.calculated_at\n} }}",
+        "options": {}
+      },
+      "id": "response-standard",
+      "name": "Response Standard",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1250, 400]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Lead Complete Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead Complete Data": {
+      "main": [
+        [
+          {
+            "node": "Calculate LQI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate LQI": {
+      "main": [
+        [
+          {
+            "node": "Update LQI in Database",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update LQI in Database": {
+      "main": [
+        [
+          {
+            "node": "Check if Premium Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check if Premium Lead": {
+      "main": [
+        [
+          {
+            "node": "Trigger Premium Lead Actions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Response Standard",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trigger Premium Lead Actions": {
+      "main": [
+        [
+          {
+            "node": "Response Premium",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "3",
+  "id": "3",
+  "meta": {
+    "instanceId": "auto_call_lqi"
+  },
+  "tags": []
+}

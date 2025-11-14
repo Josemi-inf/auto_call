@@ -1,0 +1,146 @@
+{
+  "name": "1 - Lead Scoring Calculator",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "calculate-lead-score",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "calculate-lead-score"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  l.*,\n  COUNT(DISTINCT cl.call_id) as total_calls,\n  COUNT(DISTINCT lm.message_id) as total_messages,\n  MAX(cl.created_at) as last_call,\n  COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN cl.call_id END) as successful_calls\nFROM leads l\nLEFT JOIN call_logs cl ON l.lead_id = cl.lead_id\nLEFT JOIN lead_messages lm ON l.lead_id = lm.lead_id\nWHERE l.lead_id = '{{ $json.body.lead_id }}'\nGROUP BY l.lead_id"
+      },
+      "id": "get-lead-data",
+      "name": "Get Lead Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// ========================================\n// SISTEMA DE SCORING DE LEADS\n// Puntuación de 0-100 basada en múltiples factores\n// ========================================\n\nconst lead = $input.first().json;\nlet score = 0;\nlet breakdown = {};\n\nconsole.log('Calculando score para lead:', lead.lead_id);\n\n// ========================================\n// 1. INFORMACIÓN COMPLETA (0-25 puntos)\n// ========================================\nlet infoScore = 0;\n\n// Nombre completo (10 puntos)\nif (lead.nombre && lead.nombre.trim().length > 0) infoScore += 5;\nif (lead.apellidos && lead.apellidos.trim().length > 0) infoScore += 5;\n\n// Email válido (5 puntos)\nif (lead.email && lead.email.includes('@') && lead.email.includes('.')) {\n  infoScore += 5;\n}\n\n// Teléfono válido (5 puntos)\nif (lead.telefono && lead.telefono.length >= 9) {\n  infoScore += 5;\n}\n\n// Datos de ubicación (5 puntos)\nif (lead.ciudad) infoScore += 2;\nif (lead.provincia) infoScore += 2;\nif (lead.cp && lead.cp.length >= 4) infoScore += 1;\n\nbreakdown.informacion_completa = infoScore;\nscore += infoScore;\n\nconsole.log('Info Score:', infoScore);\n\n// ========================================\n// 2. ENGAGEMENT / INTERACCIÓN (0-30 puntos)\n// ========================================\nlet engagementScore = 0;\n\nconst totalCalls = parseInt(lead.total_calls) || 0;\nconst successfulCalls = parseInt(lead.successful_calls) || 0;\nconst totalMessages = parseInt(lead.total_messages) || 0;\n\n// Llamadas realizadas (hasta 15 puntos)\nif (totalCalls > 0) {\n  // 5 puntos por llamada exitosa, hasta máximo 15\n  engagementScore += Math.min(successfulCalls * 5, 15);\n  \n  // Bonus por al menos intentar llamar\n  if (successfulCalls === 0 && totalCalls > 0) {\n    engagementScore += 2;\n  }\n}\n\n// Mensajes intercambiados (hasta 15 puntos)\nif (totalMessages > 0) {\n  // 3 puntos por mensaje, hasta máximo 15\n  engagementScore += Math.min(totalMessages * 3, 15);\n}\n\nbreakdown.engagement = engagementScore;\nscore += engagementScore;\n\nconsole.log('Engagement Score:', engagementScore, '(calls:', totalCalls, 'messages:', totalMessages, ')');\n\n// ========================================\n// 3. RECENCIA (0-20 puntos)\n// ========================================\nlet recenciaScore = 0;\n\nif (lead.last_call) {\n  const lastCallDate = new Date(lead.last_call);\n  const now = new Date();\n  const daysSinceLastCall = Math.floor((now - lastCallDate) / (1000 * 60 * 60 * 24));\n  \n  if (daysSinceLastCall <= 1) recenciaScore = 20;        // Hoy o ayer\n  else if (daysSinceLastCall <= 3) recenciaScore = 18;   // 2-3 días\n  else if (daysSinceLastCall <= 7) recenciaScore = 15;   // Esta semana\n  else if (daysSinceLastCall <= 14) recenciaScore = 12;  // Últimas 2 semanas\n  else if (daysSinceLastCall <= 30) recenciaScore = 8;   // Este mes\n  else if (daysSinceLastCall <= 60) recenciaScore = 4;   // Últimos 2 meses\n  else recenciaScore = 2;                                 // Muy antiguo\n  \n  breakdown.recencia_dias = daysSinceLastCall;\n} else {\n  // Lead nuevo sin llamadas aún\n  recenciaScore = 15;\n  breakdown.recencia_dias = 0;\n}\n\nbreakdown.recencia = recenciaScore;\nscore += recenciaScore;\n\nconsole.log('Recencia Score:', recenciaScore);\n\n// ========================================\n// 4. OPT-IN / CONSENTIMIENTO (0-15 puntos)\n// ========================================\nlet consentScore = 0;\n\n// Tiene consentimiento registrado (10 puntos)\nif (lead.consent_ts) {\n  consentScore += 10;\n}\n\n// No ha hecho opt-out (5 puntos)\nif (!lead.opt_out || lead.opt_out === false) {\n  consentScore += 5;\n}\n\nbreakdown.consentimiento = consentScore;\nscore += consentScore;\n\nconsole.log('Consent Score:', consentScore);\n\n// ========================================\n// 5. ESTADO DEL LEAD (0-10 puntos)\n// ========================================\nlet estadoScore = 0;\n\nswitch(lead.estado_actual) {\n  case 'nuevo':\n    estadoScore = 10;\n    break;\n  case 'contactado':\n    estadoScore = 9;\n    break;\n  case 'en_seguimiento':\n    estadoScore = 8;\n    break;\n  case 'interesado':\n    estadoScore = 9;\n    break;\n  case 'no_interesado':\n    estadoScore = 3;\n    break;\n  case 'convertido':\n    estadoScore = 0; // Ya convertido, no necesita más scoring\n    break;\n  case 'perdido':\n    estadoScore = 1;\n    break;\n  case 'descartado':\n    estadoScore = 0;\n    break;\n  default:\n    estadoScore = 5;\n}\n\nbreakdown.estado = estadoScore;\nscore += estadoScore;\n\nconsole.log('Estado Score:', estadoScore, '(estado:', lead.estado_actual, ')');\n\n// ========================================\n// CALCULAR CALIDAD DEL LEAD\n// ========================================\nlet calidadLead = 'frio';\n\nif (score >= 80) {\n  calidadLead = 'muy_caliente';\n} else if (score >= 60) {\n  calidadLead = 'caliente';\n} else if (score >= 40) {\n  calidadLead = 'tibio';\n} else {\n  calidadLead = 'frio';\n}\n\nconsole.log('=== RESULTADO FINAL ===');\nconsole.log('Score Total:', Math.round(score));\nconsole.log('Calidad:', calidadLead);\nconsole.log('Breakdown:', breakdown);\n\n// ========================================\n// RETORNAR RESULTADO\n// ========================================\nreturn [{\n  json: {\n    lead_id: lead.lead_id,\n    lead_score: Math.round(score),\n    calidad_lead: calidadLead,\n    score_breakdown: breakdown,\n    calculated_at: new Date().toISOString(),\n    lead_info: {\n      nombre: lead.nombre,\n      apellidos: lead.apellidos,\n      telefono: lead.telefono,\n      estado: lead.estado_actual\n    }\n  }\n}];"
+      },
+      "id": "calculate-base-score",
+      "name": "Calculate Base Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE leads \nSET \n  lead_score = {{ $json.lead_score }},\n  calidad_lead = '{{ $json.calidad_lead }}',\n  updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "update-lead-score",
+      "name": "Update Lead Score",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [850, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"lead_id\": $json.lead_id,\n  \"lead_score\": $json.lead_score,\n  \"calidad_lead\": $json.calidad_lead,\n  \"breakdown\": $json.score_breakdown,\n  \"calculated_at\": $json.calculated_at\n} }}",
+        "options": {}
+      },
+      "id": "response-success",
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": false,\n  \"error\": $json.error || \"Unknown error\",\n  \"message\": \"Failed to calculate lead score\"\n} }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "response-error",
+      "name": "Response Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 500]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Lead Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Lead Data": {
+      "main": [
+        [
+          {
+            "node": "Calculate Base Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Base Score": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Score": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "1",
+  "id": "1",
+  "meta": {
+    "instanceId": "auto_call_lead_scoring"
+  },
+  "tags": []
+}
