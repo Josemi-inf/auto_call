@@ -18,7 +18,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT \n  l.*,\n  COUNT(DISTINCT cl.call_id) as total_calls,\n  COUNT(DISTINCT lm.message_id) as total_messages,\n  MAX(cl.created_at) as last_call,\n  COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN cl.call_id END) as successful_calls\nFROM leads l\nLEFT JOIN call_logs cl ON l.lead_id = cl.lead_id\nLEFT JOIN lead_messages lm ON l.lead_id = lm.lead_id\nWHERE l.lead_id = '{{ $json.body.lead_id }}'\nGROUP BY l.lead_id"
+        "query": "SELECT \n  l.*,\n  COUNT(DISTINCT cl.call_id) as total_calls,\n  COUNT(DISTINCT lm.id) as total_messages,\n  MAX(cl.created_at) as last_call,\n  COUNT(DISTINCT CASE WHEN cl.exitoso = true THEN cl.call_id END) as successful_calls\nFROM leads l\nLEFT JOIN call_logs cl ON l.lead_id = cl.lead_id\nLEFT JOIN lead_messages lm ON l.lead_id = lm.lead_id\nWHERE l.lead_id = '{{ $json.body.lead_id }}'\nGROUP BY l.lead_id"
       },
       "id": "get-lead-data",
       "name": "Get Lead Data",

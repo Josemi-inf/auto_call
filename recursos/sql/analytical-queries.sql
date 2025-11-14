@@ -432,7 +432,7 @@ SELECT
   l.categoria_lqi,
   COUNT(DISTINCT cl.call_id) as total_llamadas,
   COUNT(DISTINCT CASE WHEN cl.exitoso THEN cl.call_id END) as llamadas_exitosas,
-  COUNT(DISTINCT lm.message_id) as total_mensajes,
+  COUNT(DISTINCT lm.id) as total_mensajes,
   COUNT(DISTINCT lcm.lead_concesionario_marca_id) as intentos_compra,
   l.created_at,
   l.call_score_updated_at,
