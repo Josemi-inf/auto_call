@@ -353,3 +353,43 @@ export async function getWeeklyLeadsData(): Promise<WeeklyLeadsData[]> {
     leads_count: item.total_leads,
   })).reverse(); // Reverse to show oldest to newest
 }
+
+// Lead Management Functions
+export async function updateLead(leadId: string, data: Partial<Lead>): Promise<Lead> {
+  if (!API_BASE_URL) {
+    await delay(DEFAULT_DELAY_MS);
+    const currentLead = mockLeads.find(l => l.lead_id === leadId) || mockLeads[0];
+    return { ...currentLead, ...data };
+  }
+  const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error(`Update lead failed: ${res.status}`);
+  return (await res.json()) as Lead;
+}
+
+export async function deleteLead(leadId: string): Promise<{ success: boolean }> {
+  if (!API_BASE_URL) {
+    await delay(DEFAULT_DELAY_MS);
+    return { success: true };
+  }
+  const res = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error(`Delete lead failed: ${res.status}`);
+  return { success: true };
+}
+
+export async function exportLeadData(leadId: string): Promise<Blob> {
+  if (!API_BASE_URL) {
+    await delay(DEFAULT_DELAY_MS);
+    const lead = mockLeads.find(l => l.lead_id === leadId) || mockLeads[0];
+    const dataStr = JSON.stringify(lead, null, 2);
+    return new Blob([dataStr], { type: 'application/json' });
+  }
+  const res = await fetch(`${API_BASE_URL}/leads/${leadId}/export`);
+  if (!res.ok) throw new Error(`Export lead failed: ${res.status}`);
+  return await res.blob();
+}
