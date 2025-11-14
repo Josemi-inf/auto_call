@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { getLeadById } from "@/services/api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { getLeadById, updateLead, deleteLead, exportLeadData } from "@/services/api";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -18,6 +18,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from "@/hooks/use-toast";
 
 const qualityConfig = {
   frio: { label: "Frío", color: "bg-slate-500", icon: "❄️" },
@@ -35,13 +46,99 @@ const statusColors = {
 export default function LeadDetail() {
   const { leadId } = useParams<{ leadId: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showOptOutDialog, setShowOptOutDialog] = useState(false);
 
   const { data: lead, isLoading } = useQuery({
     queryKey: ["lead", leadId],
     queryFn: () => getLeadById(leadId!),
     enabled: !!leadId
   });
+
+  // Mutation for updating lead
+  const updateLeadMutation = useMutation({
+    mutationFn: (data: Partial<typeof lead>) => updateLead(leadId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["lead", leadId] });
+      toast({
+        title: "Lead actualizado",
+        description: "Los cambios se han guardado correctamente.",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo actualizar el lead.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Mutation for deleting lead
+  const deleteLeadMutation = useMutation({
+    mutationFn: () => deleteLead(leadId!),
+    onSuccess: () => {
+      toast({
+        title: "Lead eliminado",
+        description: "El lead se ha eliminado correctamente.",
+      });
+      navigate("/leads");
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el lead.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Handler functions
+  const handleEditLead = () => {
+    // For now, show a toast. In the future, navigate to edit page
+    toast({
+      title: "Función en desarrollo",
+      description: "La edición de leads estará disponible próximamente.",
+    });
+  };
+
+  const handleExportData = async () => {
+    try {
+      const blob = await exportLeadData(leadId!);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `lead_${leadId}_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Datos exportados",
+        description: "Los datos del lead se han descargado correctamente.",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "No se pudo exportar los datos del lead.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleMarkOptOut = () => {
+    updateLeadMutation.mutate({ estado_actual: "opt_out" });
+    setShowOptOutDialog(false);
+  };
+
+  const handleDeleteLead = () => {
+    deleteLeadMutation.mutate();
+    setShowDeleteDialog(false);
+  };
 
   if (isLoading) {
     return (
@@ -101,10 +198,22 @@ export default function LeadDetail() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Editar lead</DropdownMenuItem>
-              <DropdownMenuItem>Exportar datos</DropdownMenuItem>
-              <DropdownMenuItem>Marcar como opt-out</DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600">Eliminar lead</DropdownMenuItem>
+              <DropdownMenuItem onClick={handleEditLead}>
+                Editar lead
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExportData}>
+                <Download className="h-4 w-4 mr-2" />
+                Exportar datos
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowOptOutDialog(true)}>
+                Marcar como opt-out
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-red-600"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                Eliminar lead
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -351,6 +460,47 @@ export default function LeadDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Opt-Out Confirmation Dialog */}
+      <AlertDialog open={showOptOutDialog} onOpenChange={setShowOptOutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Marcar lead como opt-out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción marcará al lead como no interesado. El lead dejará de recibir comunicaciones automáticas.
+              Puedes revertir esta acción más tarde si es necesario.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleMarkOptOut}>
+              Confirmar opt-out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar lead permanentemente?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente el lead y todos sus datos asociados,
+              incluyendo historial de llamadas, mensajes y notas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteLead}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Eliminar permanentemente
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
