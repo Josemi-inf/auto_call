@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getLeadById, updateLead, deleteLead, exportLeadData } from "@/services/api";
+import { getLeadById, updateLead, deleteLead } from "@/services/api";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote, Download, Edit, Ban, Trash2 } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote, Edit, Ban, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,6 +30,16 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const qualityConfig = {
   frio: { label: "Frío", color: "bg-slate-500", icon: "❄️" },
@@ -52,6 +62,15 @@ export default function LeadDetail() {
   const [selectedBrand, setSelectedBrand] = useState<string | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showOptOutDialog, setShowOptOutDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    nombre: "",
+    apellidos: "",
+    email: "",
+    ciudad: "",
+    provincia: "",
+    codigo_postal: ""
+  });
 
   const { data: lead, isLoading } = useQuery({
     queryKey: ["lead", leadId],
@@ -99,36 +118,22 @@ export default function LeadDetail() {
 
   // Handler functions
   const handleEditLead = () => {
-    // For now, show a toast. In the future, navigate to edit page
-    toast({
-      title: "Función en desarrollo",
-      description: "La edición de leads estará disponible próximamente.",
-    });
+    if (lead) {
+      setEditFormData({
+        nombre: lead.nombre || "",
+        apellidos: lead.apellidos || "",
+        email: lead.email || "",
+        ciudad: lead.ciudad || "",
+        provincia: lead.provincia || "",
+        codigo_postal: lead.codigo_postal || ""
+      });
+      setShowEditDialog(true);
+    }
   };
 
-  const handleExportData = async () => {
-    try {
-      const blob = await exportLeadData(leadId!);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `lead_${leadId}_${new Date().toISOString().split('T')[0]}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-
-      toast({
-        title: "Datos exportados",
-        description: "Los datos del lead se han descargado correctamente.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "No se pudo exportar los datos del lead.",
-        variant: "destructive",
-      });
-    }
+  const handleSaveEdit = () => {
+    updateLeadMutation.mutate(editFormData);
+    setShowEditDialog(false);
   };
 
   const handleMarkOptOut = () => {
@@ -205,13 +210,6 @@ export default function LeadDetail() {
               >
                 <Edit className="h-4 w-4" />
                 Editar lead
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={handleExportData}
-                className="hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950 dark:hover:text-green-300"
-              >
-                <Download className="h-4 w-4" />
-                Exportar datos
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => setShowOptOutDialog(true)}
@@ -474,6 +472,90 @@ export default function LeadDetail() {
           </Card>
         </div>
       </div>
+
+      {/* Edit Lead Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="sm:max-w-[550px]">
+          <DialogHeader>
+            <DialogTitle>Editar Lead</DialogTitle>
+            <DialogDescription>
+              Actualiza la información del lead. Los cambios se guardarán inmediatamente.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="nombre">Nombre</Label>
+                <Input
+                  id="nombre"
+                  value={editFormData.nombre}
+                  onChange={(e) => setEditFormData({ ...editFormData, nombre: e.target.value })}
+                  placeholder="Juan"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="apellidos">Apellidos</Label>
+                <Input
+                  id="apellidos"
+                  value={editFormData.apellidos}
+                  onChange={(e) => setEditFormData({ ...editFormData, apellidos: e.target.value })}
+                  placeholder="Pérez"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={editFormData.email}
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                placeholder="juan@example.com"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ciudad">Ciudad</Label>
+                <Input
+                  id="ciudad"
+                  value={editFormData.ciudad}
+                  onChange={(e) => setEditFormData({ ...editFormData, ciudad: e.target.value })}
+                  placeholder="Madrid"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="provincia">Provincia</Label>
+                <Input
+                  id="provincia"
+                  value={editFormData.provincia}
+                  onChange={(e) => setEditFormData({ ...editFormData, provincia: e.target.value })}
+                  placeholder="Madrid"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="codigo_postal">Código Postal</Label>
+              <Input
+                id="codigo_postal"
+                value={editFormData.codigo_postal}
+                onChange={(e) => setEditFormData({ ...editFormData, codigo_postal: e.target.value })}
+                placeholder="28001"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveEdit}>
+              Guardar cambios
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Opt-Out Confirmation Dialog */}
       <AlertDialog open={showOptOutDialog} onOpenChange={setShowOptOutDialog}>
