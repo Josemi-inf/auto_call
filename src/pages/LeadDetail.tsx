@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { getLeadById, updateLead, deleteLead, exportLeadData } from "@/services/api";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote, Download } from "lucide-react";
+import { ArrowLeft, Phone, MessageSquare, MoreVertical, Mail, MapPin, Star, Flame, Car, History, StickyNote, Download, Edit, Ban, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -16,6 +16,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
@@ -197,21 +198,34 @@ export default function LeadDetail() {
                 <MoreVertical className="h-4 w-4 ml-2" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleEditLead}>
+            <DropdownMenuContent align="end" className="shadow-xl">
+              <DropdownMenuItem
+                onClick={handleEditLead}
+                className="hover:bg-blue-50 hover:text-blue-700 dark:hover:bg-blue-950 dark:hover:text-blue-300"
+              >
+                <Edit className="h-4 w-4" />
                 Editar lead
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportData}>
-                <Download className="h-4 w-4 mr-2" />
+              <DropdownMenuItem
+                onClick={handleExportData}
+                className="hover:bg-green-50 hover:text-green-700 dark:hover:bg-green-950 dark:hover:text-green-300"
+              >
+                <Download className="h-4 w-4" />
                 Exportar datos
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowOptOutDialog(true)}>
+              <DropdownMenuItem
+                onClick={() => setShowOptOutDialog(true)}
+                className="hover:bg-orange-50 hover:text-orange-700 dark:hover:bg-orange-950 dark:hover:text-orange-300"
+              >
+                <Ban className="h-4 w-4" />
                 Marcar como opt-out
               </DropdownMenuItem>
+              <DropdownMenuSeparator className="my-2" />
               <DropdownMenuItem
-                className="text-red-600"
+                className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:hover:bg-red-950 dark:hover:text-red-400"
                 onClick={() => setShowDeleteDialog(true)}
               >
+                <Trash2 className="h-4 w-4" />
                 Eliminar lead
               </DropdownMenuItem>
             </DropdownMenuContent>
