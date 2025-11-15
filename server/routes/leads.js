@@ -253,6 +253,11 @@ router.patch('/:id', updateLeadValidation, async (req, res, next) => {
     const { id } = req.params;
     const updates = req.body;
 
+    // Map frontend field names to database column names
+    const fieldMapping = {
+      'codigo_postal': 'cp'
+    };
+
     // Build dynamic update query
     const fields = Object.keys(updates);
     if (fields.length === 0) {
@@ -260,7 +265,11 @@ router.patch('/:id', updateLeadValidation, async (req, res, next) => {
     }
 
     const setClause = fields
-      .map((field, index) => `${field} = $${index + 2}`)
+      .map((field, index) => {
+        // Use mapped field name if it exists, otherwise use original field name
+        const dbFieldName = fieldMapping[field] || field;
+        return `${dbFieldName} = $${index + 2}`;
+      })
       .join(', ');
 
     const values = [id, ...fields.map(field => updates[field])];
