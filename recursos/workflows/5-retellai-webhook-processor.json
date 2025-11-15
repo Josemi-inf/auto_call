@@ -1,0 +1,315 @@
+{
+  "name": "5 - RetellAI Webhook Processor",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "retellai-call-completed",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-retellai",
+      "name": "Webhook - RetellAI Call",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "retellai-call-completed"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Este código extrae todas las variables necesarias del webhook de RetellAI\n// El código completo está en: recursos/workflows/retellai-lead-extractor.js\n\nconst retellData = $input.first().json;\n\nconsole.log('🔍 Procesando datos de RetellAI...');\n\n// Importar el código del extractor\n// NOTA: Copiar aquí el contenido completo de retellai-lead-extractor.js\n// O usar el módulo de n8n para importar código externo\n\n// Por ahora, extraer las variables básicas\nconst call_id_retell = retellData.call?.call_id || null;\nconst to_number = retellData.call?.to_number || retellData.to_number || null;\nconst from_number = retellData.call?.from_number || retellData.from_number || null;\n\n// Buscar el lead por teléfono\nreturn [{\n  json: {\n    telefono: to_number,\n    call_id_retell: call_id_retell,\n    webhook_data: retellData\n  }\n}];"
+      },
+      "id": "extract-phone",
+      "name": "Extract Phone Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  l.lead_id,\n  l.nombre,\n  l.apellidos,\n  l.lead_score,\n  l.calidad_lead,\n  lcm.lead_concesionario_marca_id,\n  COUNT(cl.call_id) as numero_llamadas\nFROM leads l\nLEFT JOIN lead_concesionario_marca lcm ON l.lead_id = lcm.lead_id\nLEFT JOIN call_logs cl ON l.lead_id = cl.lead_id\nWHERE l.telefono = '{{ $json.telefono }}'\nGROUP BY l.lead_id, lcm.lead_concesionario_marca_id\nLIMIT 1"
+      },
+      "id": "find-lead",
+      "name": "Find Lead by Phone",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [650, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// COPIAR AQUÍ EL CÓDIGO COMPLETO DE retellai-lead-extractor.js\n// Este nodo procesa todos los datos del webhook y extrae variables\n\nconst retellData = $input.first().json.webhook_data;\nconst leadData = $input.first().json;\n\nconsole.log('Lead encontrado:', leadData.lead_id);\n\n// INCLUIR TODO EL CÓDIGO DEL EXTRACTOR AQUÍ\n// Ver archivo: recursos/workflows/retellai-lead-extractor.js\n\n// Resultado temporal para ejemplo\nreturn [{\n  json: {\n    lead_id: leadData.lead_id,\n    lead_concesionario_marca_id: leadData.lead_concesionario_marca_id,\n    call_id_retell: retellData.call?.call_id,\n    // ... todas las demás variables extraídas\n  }\n}];"
+      },
+      "id": "extract-all-variables",
+      "name": "Extract All Variables",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Insertar registro en call_logs\nINSERT INTO call_logs (\n  lead_id,\n  lead_concesionario_marca_id,\n  call_id_retell,\n  telefono,\n  numero_llamada,\n  resultado,\n  exitoso,\n  duracion_ms,\n  start_call,\n  end_call,\n  canal,\n  agente_retell,\n  call_retell,\n  url_llamada,\n  transcripccion,\n  audio_cost,\n  memory_cost,\n  input_data,\n  output_data,\n  error_message\n) VALUES (\n  '{{ $json.lead_id }}',\n  '{{ $json.lead_concesionario_marca_id }}',\n  '{{ $json.call_logs.call_id_retell }}',\n  '{{ $json.call_logs.telefono }}',\n  {{ $json.call_logs.numero_llamada }},\n  '{{ $json.call_logs.resultado }}',\n  {{ $json.call_logs.exitoso }},\n  {{ $json.call_logs.duracion_ms }},\n  '{{ $json.call_logs.start_call }}',\n  '{{ $json.call_logs.end_call }}',\n  '{{ $json.call_logs.canal }}',\n  '{{ $json.call_logs.agente_retell }}',\n  '{{ $json.call_logs.call_retell }}',\n  '{{ $json.call_logs.url_llamada }}',\n  '{{ $json.call_logs.transcripccion }}',\n  {{ $json.call_logs.audio_cost }},\n  {{ $json.call_logs.memory_cost }},\n  '{{ JSON.stringify($json.call_logs.input_data) }}'::jsonb,\n  '{{ JSON.stringify($json.call_logs.output_data) }}'::jsonb,\n  '{{ $json.call_logs.error_message }}'\n)\nRETURNING call_id;"
+      },
+      "id": "insert-call-log",
+      "name": "Insert Call Log",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1050, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Actualizar tabla leads con nuevos datos\nUPDATE leads\nSET \n  estado_actual = '{{ $json.leads.estado_actual }}',\n  lead_score = LEAST(100, COALESCE(lead_score, 0) + {{ $json.leads.lead_score_increment }}),\n  calidad_lead = '{{ $json.leads.calidad_lead }}',\n  last_contact_at = '{{ $json.leads.last_contact_at }}',\n  notas = CONCAT(COALESCE(notas, ''), '\\n\\n', '{{ $json.leads.notas }}'),\n  updated_at = NOW()\nWHERE lead_id = '{{ $json.lead_id }}'\nRETURNING *;"
+      },
+      "id": "update-lead",
+      "name": "Update Lead",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1250, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "-- Actualizar lead_concesionario_marca con datos específicos\nUPDATE lead_concesionario_marca\nSET \n  estado = '{{ $json.lead_concesionario_marca.estado }}',\n  urgencia = '{{ $json.lead_concesionario_marca.urgencia }}',\n  prioridad = {{ $json.lead_concesionario_marca.prioridad }},\n  modelo = COALESCE('{{ $json.lead_concesionario_marca.modelo }}', modelo),\n  fecha_proxima_accion = '{{ $json.lead_concesionario_marca.fecha_proxima_accion }}',\n  next_action_at = '{{ $json.lead_concesionario_marca.next_action_at }}',\n  proxima_accion = '{{ $json.lead_concesionario_marca.proxima_accion }}',\n  notas = CONCAT(COALESCE(notas, ''), '\\n\\n', '{{ $json.lead_concesionario_marca.notas }}')\nWHERE lead_concesionario_marca_id = '{{ $json.lead_concesionario_marca_id }}'\nRETURNING *;"
+      },
+      "id": "update-lcm",
+      "name": "Update Lead Assignment",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.4,
+      "position": [1450, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.lead_messages.should_send_whatsapp }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-whatsapp",
+      "name": "Should Send WhatsApp?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://n8n-n8n.ko9agy.easypanel.host/webhook/send-whatsapp",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"lead_id\": $json.lead_id,\n  \"template\": $json.lead_messages.whatsapp_template,\n  \"variables\": $json.lead_messages.whatsapp_variables\n} }}",
+        "options": {}
+      },
+      "id": "send-whatsapp",
+      "name": "Send WhatsApp Follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/calculate-lead-score",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ {\n  \"lead_id\": $json.lead_id\n} }}",
+        "options": {}
+      },
+      "id": "recalculate-score",
+      "name": "Recalculate Lead Score",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1850, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": true,\n  \"message\": \"RetellAI webhook procesado exitosamente\",\n  \"lead_id\": $json.lead_id,\n  \"call_id\": $json.call_id,\n  \"estado_actualizado\": $json.leads.estado_actual,\n  \"score_increment\": $json.leads.lead_score_increment,\n  \"proxima_accion\": $json.lead_concesionario_marca.proxima_accion,\n  \"processed_at\": $json.metadata.processed_at\n} }}",
+        "options": {}
+      },
+      "id": "response-success",
+      "name": "Response Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [2050, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ {\n  \"success\": false,\n  \"error\": $json.error || \"Error desconocido\",\n  \"message\": \"Error al procesar webhook de RetellAI\"\n} }}",
+        "options": {
+          "responseCode": 500
+        }
+      },
+      "id": "response-error",
+      "name": "Response Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [850, 500]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook - RetellAI Call": {
+      "main": [
+        [
+          {
+            "node": "Extract Phone Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Phone Number": {
+      "main": [
+        [
+          {
+            "node": "Find Lead by Phone",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Lead by Phone": {
+      "main": [
+        [
+          {
+            "node": "Extract All Variables",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract All Variables": {
+      "main": [
+        [
+          {
+            "node": "Insert Call Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Call Log": {
+      "main": [
+        [
+          {
+            "node": "Update Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead": {
+      "main": [
+        [
+          {
+            "node": "Update Lead Assignment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Lead Assignment": {
+      "main": [
+        [
+          {
+            "node": "Should Send WhatsApp?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Send WhatsApp?": {
+      "main": [
+        [
+          {
+            "node": "Send WhatsApp Follow-up",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Recalculate Lead Score",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recalculate Lead Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send WhatsApp Follow-up": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recalculate Lead Score": {
+      "main": [
+        [
+          {
+            "node": "Response Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5",
+  "id": "5",
+  "meta": {
+    "instanceId": "retellai_webhook_processor"
+  },
+  "tags": ["retellai", "webhook", "lead-processing"]
+}
