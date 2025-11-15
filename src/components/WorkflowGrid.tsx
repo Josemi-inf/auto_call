@@ -19,7 +19,6 @@ import {
   RotateCcw,
   Zap,
   Globe,
-  Calendar,
   Users,
   AlertTriangle,
   ExternalLink,
@@ -98,13 +97,6 @@ function WorkflowCard({ workflow, stats, onToggleActive, onExecute, isExecuting 
     }
   };
 
-  const getNodeTypes = () => {
-    if (!workflow.nodes) return [];
-    const types = workflow.nodes.map(node => node.type);
-    const uniqueTypes = [...new Set(types)];
-    return uniqueTypes.slice(0, 3); // Mostrar solo los primeros 3 tipos
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-ES', {
       day: '2-digit',
@@ -118,50 +110,39 @@ function WorkflowCard({ workflow, stats, onToggleActive, onExecute, isExecuting 
   return (
     <Card className="p-6 hover:shadow-xl transition-all duration-300 border-gray-200 bg-white hover:bg-gray-50/50">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="flex items-center space-x-2 mb-3">
-            <div className="p-1.5 rounded-md bg-gray-100">
-              <Activity className="h-4 w-4 text-gray-700" />
-            </div>
-            <h3 className="font-semibold text-sm text-gray-900 truncate flex-1">
-              {workflow.name}
-            </h3>
+      <div className="mb-4">
+        <div className="flex items-center space-x-2 mb-3">
+          <div className="p-1.5 rounded-md bg-gray-100">
+            <Activity className="h-4 w-4 text-gray-700" />
           </div>
-
-          <div className="flex flex-wrap gap-1 mb-3">
-            {workflow.tags?.map((tag, index) => (
-              <Badge key={index} variant="outline" className="text-xs border-gray-200 text-gray-600 bg-gray-50">
-                {typeof tag === 'string' ? tag : tag.name}
-              </Badge>
-            ))}
-            {hasWebhook && (
-              <Badge variant="outline" className="text-xs border-gray-300 text-gray-700 bg-white">
-                <Globe className="h-3 w-3 mr-1" />
-                Webhook
-              </Badge>
-            )}
-          </div>
+          <h3 className="font-semibold text-sm text-gray-900 truncate flex-1">
+            {workflow.name}
+          </h3>
         </div>
 
-        <div className="flex flex-col items-end space-y-2">
-          <div className="flex space-x-1">
-            <Button
-              size="sm"
-              variant={workflow.active ? "default" : "outline"}
-              onClick={() => onToggleActive(workflow.id, !workflow.active)}
-              className={`h-6 px-2 text-xs transition-all duration-300 ${
-                workflow.active
-                  ? "bg-black text-white hover:bg-gray-800 shadow-lg shadow-black/10"
-                  : "border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-400"
-              }`}
-            >
-              <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
-                workflow.active ? "bg-white" : "bg-gray-400"
-              }`} />
-              {workflow.active ? "Activo" : "Inactivo"}
-            </Button>
-          </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={workflow.active ? "default" : "outline"}
+            onClick={() => onToggleActive(workflow.id, !workflow.active)}
+            className={`h-7 px-3 text-xs transition-all duration-300 ${
+              workflow.active
+                ? "bg-black text-white hover:bg-gray-800 shadow-lg shadow-black/10"
+                : "border-gray-300 text-gray-500 hover:bg-gray-50 hover:text-gray-700 hover:border-gray-400"
+            }`}
+          >
+            <div className={`w-1.5 h-1.5 rounded-full mr-1.5 ${
+              workflow.active ? "bg-white" : "bg-gray-400"
+            }`} />
+            {workflow.active ? "Activo" : "Inactivo"}
+          </Button>
+
+          {(hasWebhook || configuredWebhookUrl) && (
+            <Badge variant="outline" className="text-xs border-gray-300 text-gray-700 bg-white h-7 px-2">
+              <Globe className="h-3 w-3 mr-1" />
+              Webhook
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -191,43 +172,6 @@ function WorkflowCard({ workflow, stats, onToggleActive, onExecute, isExecuting 
           <p className="text-xs text-gray-500 font-medium">Ejecuciones</p>
         </div>
       </div>
-
-      {/* Node Types */}
-      <div className="mb-4">
-        <p className="text-xs text-gray-500 mb-2 font-medium">Tipos de nodos:</p>
-        <div className="flex flex-wrap gap-1">
-          {getNodeTypes().map((type, index) => (
-            <Badge key={index} variant="secondary" className="text-xs bg-gray-100 text-gray-700 border-0">
-              {type.replace('n8n-nodes-base.', '')}
-            </Badge>
-          ))}
-        </div>
-      </div>
-
-      {/* Webhook Status */}
-      {(hasWebhook || configuredWebhookUrl) && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <div className="flex items-center space-x-2">
-            <Globe className="h-4 w-4 text-gray-600" />
-            <span className="text-sm font-medium text-gray-900">Webhook</span>
-            <Badge
-              variant={configuredWebhookUrl ? "default" : "secondary"}
-              className={`text-xs ${
-                configuredWebhookUrl
-                  ? "bg-black text-white"
-                  : "bg-gray-200 text-gray-600"
-              }`}
-            >
-              {configuredWebhookUrl ? "Configurado" : "Detectado"}
-            </Badge>
-          </div>
-          {configuredWebhookUrl && (
-            <div className="mt-2 text-xs text-gray-500 break-all">
-              {configuredWebhookUrl}
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Execution Stats */}
       {stats && (
@@ -268,12 +212,8 @@ function WorkflowCard({ workflow, stats, onToggleActive, onExecute, isExecuting 
         </div>
       )}
 
-      {/* Dates */}
-      <div className="text-xs text-gray-500 mb-4 space-y-1">
-        <div className="flex items-center space-x-1">
-          <Calendar className="h-3 w-3" />
-          <span>Creado: {formatDate(workflow.createdAt)}</span>
-        </div>
+      {/* Date */}
+      <div className="text-xs text-gray-500 mb-4">
         <div className="flex items-center space-x-1">
           <RotateCcw className="h-3 w-3" />
           <span>Actualizado: {formatDate(workflow.updatedAt)}</span>

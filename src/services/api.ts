@@ -44,69 +44,119 @@ async function maybeFetch<T>(path: string, init?: RequestInit, fallback?: T): Pr
   const url = `${API_BASE_URL}${path}`;
   const res = await fetch(url, init);
   if (!res.ok) throw new Error(`Request failed: ${res.status}`);
-  return (await res.json()) as T;
+
+  const json = await res.json();
+
+  // Backend returns {data: [...]} format, extract the data
+  if (json && typeof json === 'object' && 'data' in json) {
+    return json.data as T;
+  }
+
+  return json as T;
 }
 
 // Leads
 export async function getLeads(): Promise<Lead[]> {
-  if (!WEBHOOK_GET_LEADS) {
-    await delay(DEFAULT_DELAY_MS);
-    // Try to get from localStorage first
-    const cachedLeads = localStorage.getItem('mockLeads');
-    const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
-    console.log('[Mock API] Using localStorage for getLeads');
-    return leads;
+  // Priority 1: Use Backend Express API if configured
+  if (API_BASE_URL && !WEBHOOK_GET_LEADS) {
+    console.log('[Backend API] Fetching leads from Express server:', API_BASE_URL);
+    return maybeFetch<Lead[]>('/leads', undefined, mockLeads);
   }
 
-  try {
-    const res = await fetch(WEBHOOK_GET_LEADS, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" }
-    });
+  // Priority 2: Use n8n Webhooks if configured
+  if (WEBHOOK_GET_LEADS) {
+    try {
+      const res = await fetch(WEBHOOK_GET_LEADS, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
 
-    if (!res.ok) throw new Error(`Get leads failed: ${res.status}`);
+      if (!res.ok) throw new Error(`Get leads failed: ${res.status}`);
 
-    const data = await res.json();
-    console.log('[n8n API] Leads fetched from PostgreSQL:', data);
+      const data = await res.json();
+      console.log('[n8n API] Raw webhook response:', data);
 
-    // Handle both { data: [] } and [] formats
-    return data.data || data;
-  } catch (error) {
-    console.error('[n8n API] Error fetching leads:', error);
-    throw error;
+      // Handle both { data: [] } and [] formats
+      let leads = data.data || data;
+
+      // Validate that we got an array
+      if (!Array.isArray(leads)) {
+        console.error('[n8n API] ❌ ERROR: Webhook returned invalid data format');
+        console.error('[n8n API] Expected: array of leads');
+        console.error('[n8n API] Received:', typeof leads, leads);
+        console.error('[n8n API] ');
+        console.error('[n8n API] 🔧 FIX NEEDED IN N8N:');
+        console.error('[n8n API] 1. Open your "GET Leads" workflow in n8n');
+        console.error('[n8n API] 2. Find the "Respond to Webhook" node (last node)');
+        console.error('[n8n API] 3. Remove quotes from {{ $json }} expression');
+        console.error('[n8n API] 4. Or set "Respond With" to "All Items"');
+        console.error('[n8n API] ');
+        console.warn('[n8n API] ⚠️  Using mock data as fallback');
+
+        // Use mock data as fallback
+        await delay(DEFAULT_DELAY_MS);
+        const cachedLeads = localStorage.getItem('mockLeads');
+        return cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+      }
+
+      console.log('[n8n API] ✅ Successfully fetched', leads.length, 'leads from PostgreSQL');
+      return leads;
+    } catch (error) {
+      console.error('[n8n API] Error fetching leads:', error);
+      console.warn('[n8n API] ⚠️  Using mock data as fallback');
+
+      // Use mock data as fallback
+      await delay(DEFAULT_DELAY_MS);
+      const cachedLeads = localStorage.getItem('mockLeads');
+      return cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+    }
   }
+
+  // Priority 3: Use mock data from localStorage
+  await delay(DEFAULT_DELAY_MS);
+  const cachedLeads = localStorage.getItem('mockLeads');
+  const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+  console.log('[Mock API] Using localStorage for getLeads');
+  return leads;
 }
 
 export async function getLeadById(leadId: string): Promise<Lead> {
-  if (!WEBHOOK_GET_LEAD_BY_ID) {
-    await delay(DEFAULT_DELAY_MS);
-    // Try to get from localStorage first
-    const cachedLeads = localStorage.getItem('mockLeads');
-    const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
-    const lead = leads.find((l: Lead) => l.lead_id === leadId) || leads[0];
-    console.log('[Mock API] Using localStorage for getLeadById');
-    return lead;
+  // Priority 1: Use Backend Express API if configured
+  if (API_BASE_URL && !WEBHOOK_GET_LEAD_BY_ID) {
+    console.log('[Backend API] Fetching lead by ID from Express server:', leadId);
+    return maybeFetch<Lead>(`/leads/${leadId}`, undefined, mockLeads[0]);
   }
 
-  try {
-    // Try path parameter first (append leadId to webhook URL)
-    const url = `${WEBHOOK_GET_LEAD_BY_ID}/${leadId}`;
-    const res = await fetch(url, {
-      method: "GET",
-      headers: { "Content-Type": "application/json" }
-    });
+  // Priority 2: Use n8n Webhooks if configured
+  if (WEBHOOK_GET_LEAD_BY_ID) {
+    try {
+      // Try path parameter first (append leadId to webhook URL)
+      const url = `${WEBHOOK_GET_LEAD_BY_ID}/${leadId}`;
+      const res = await fetch(url, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
 
-    if (!res.ok) throw new Error(`Get lead by ID failed: ${res.status}`);
+      if (!res.ok) throw new Error(`Get lead by ID failed: ${res.status}`);
 
-    const data = await res.json();
-    console.log('[n8n API] Lead fetched from PostgreSQL:', data);
+      const data = await res.json();
+      console.log('[n8n API] Lead fetched from PostgreSQL:', data);
 
-    // Handle both { data: {} } and {} formats
-    return data.data || data;
-  } catch (error) {
-    console.error('[n8n API] Error fetching lead by ID:', error);
-    throw error;
+      // Handle both { data: {} } and {} formats
+      return data.data || data;
+    } catch (error) {
+      console.error('[n8n API] Error fetching lead by ID:', error);
+      throw error;
+    }
   }
+
+  // Priority 3: Use mock data from localStorage
+  await delay(DEFAULT_DELAY_MS);
+  const cachedLeads = localStorage.getItem('mockLeads');
+  const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+  const lead = leads.find((l: Lead) => l.lead_id === leadId) || leads[0];
+  console.log('[Mock API] Using localStorage for getLeadById');
+  return lead;
 }
 
 // Workflows (webhooks)
@@ -412,82 +462,105 @@ export async function getWeeklyLeadsData(): Promise<WeeklyLeadsData[]> {
 
 // Lead Management Functions
 export async function updateLead(leadId: string, data: Partial<Lead>): Promise<Lead> {
-  if (!WEBHOOK_UPDATE_LEAD) {
-    await delay(DEFAULT_DELAY_MS);
-
-    // Get cached leads from localStorage
-    const cachedLeads = localStorage.getItem('mockLeads');
-    let leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
-
-    // Find and update the lead
-    const leadIndex = leads.findIndex((l: Lead) => l.lead_id === leadId);
-    if (leadIndex !== -1) {
-      leads[leadIndex] = { ...leads[leadIndex], ...data };
-      // Save to localStorage
-      localStorage.setItem('mockLeads', JSON.stringify(leads));
-      console.log('[Mock API] Lead updated and saved to localStorage:', leads[leadIndex]);
-      return leads[leadIndex];
-    }
-
-    const currentLead = leads[0];
-    return { ...currentLead, ...data };
-  }
-
-  try {
-    // Send leadId in URL path and data in body
-    const url = `${WEBHOOK_UPDATE_LEAD}/${leadId}`;
-    const res = await fetch(url, {
+  // Priority 1: Use Backend Express API if configured
+  if (API_BASE_URL && !WEBHOOK_UPDATE_LEAD) {
+    console.log('[Backend API] Updating lead via Express server:', leadId);
+    return maybeFetch<Lead>(`/leads/${leadId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
-    });
-
-    if (!res.ok) throw new Error(`Update lead failed: ${res.status}`);
-
-    const result = await res.json();
-    console.log('[n8n API] Lead updated in PostgreSQL:', result);
-
-    return result;
-  } catch (error) {
-    console.error('[n8n API] Error updating lead:', error);
-    throw error;
+    }, mockLeads[0]);
   }
+
+  // Priority 2: Use n8n Webhooks if configured
+  if (WEBHOOK_UPDATE_LEAD) {
+    try {
+      // Send leadId in URL path and data in body
+      const url = `${WEBHOOK_UPDATE_LEAD}/${leadId}`;
+      const res = await fetch(url, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(data),
+      });
+
+      if (!res.ok) throw new Error(`Update lead failed: ${res.status}`);
+
+      const result = await res.json();
+      console.log('[n8n API] Lead updated in PostgreSQL:', result);
+
+      return result;
+    } catch (error) {
+      console.error('[n8n API] Error updating lead:', error);
+      throw error;
+    }
+  }
+
+  // Priority 3: Use mock data from localStorage
+  await delay(DEFAULT_DELAY_MS);
+
+  // Get cached leads from localStorage
+  const cachedLeads = localStorage.getItem('mockLeads');
+  let leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+
+  // Find and update the lead
+  const leadIndex = leads.findIndex((l: Lead) => l.lead_id === leadId);
+  if (leadIndex !== -1) {
+    leads[leadIndex] = { ...leads[leadIndex], ...data };
+    // Save to localStorage
+    localStorage.setItem('mockLeads', JSON.stringify(leads));
+    console.log('[Mock API] Lead updated and saved to localStorage:', leads[leadIndex]);
+    return leads[leadIndex];
+  }
+
+  const currentLead = leads[0];
+  return { ...currentLead, ...data };
 }
 
 export async function deleteLead(leadId: string): Promise<{ success: boolean }> {
-  if (!WEBHOOK_DELETE_LEAD) {
-    await delay(DEFAULT_DELAY_MS);
-
-    // Get cached leads from localStorage
-    const cachedLeads = localStorage.getItem('mockLeads');
-    let leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
-
-    // Remove the lead
-    leads = leads.filter((l: Lead) => l.lead_id !== leadId);
-
-    // Save to localStorage
-    localStorage.setItem('mockLeads', JSON.stringify(leads));
-    console.log('[Mock API] Lead deleted from localStorage');
-
-    return { success: true };
-  }
-
-  try {
-    // Send leadId in URL path
-    const url = `${WEBHOOK_DELETE_LEAD}/${leadId}`;
-    const res = await fetch(url, {
+  // Priority 1: Use Backend Express API if configured
+  if (API_BASE_URL && !WEBHOOK_DELETE_LEAD) {
+    console.log('[Backend API] Deleting lead via Express server:', leadId);
+    return maybeFetch<{ success: boolean }>(`/leads/${leadId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" }
-    });
-
-    if (!res.ok) throw new Error(`Delete lead failed: ${res.status}`);
-
-    console.log('[n8n API] Lead deleted from PostgreSQL');
-    return { success: true };
-  } catch (error) {
-    console.error('[n8n API] Error deleting lead:', error);
-    throw error;
+    }, { success: true });
   }
+
+  // Priority 2: Use n8n Webhooks if configured
+  if (WEBHOOK_DELETE_LEAD) {
+    try {
+      // Send leadId in URL path
+      const url = `${WEBHOOK_DELETE_LEAD}/${leadId}`;
+      const res = await fetch(url, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      if (!res.ok) throw new Error(`Delete lead failed: ${res.status}`);
+
+      console.log('[n8n API] Lead deleted from PostgreSQL');
+      return { success: true };
+    } catch (error) {
+      console.error('[n8n API] Error deleting lead:', error);
+      throw error;
+    }
+  }
+
+  // Priority 3: Use mock data from localStorage
+  await delay(DEFAULT_DELAY_MS);
+
+  // Get cached leads from localStorage
+  const cachedLeads = localStorage.getItem('mockLeads');
+  let leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
+
+  // Remove the lead
+  leads = leads.filter((l: Lead) => l.lead_id !== leadId);
+
+  // Save to localStorage
+  localStorage.setItem('mockLeads', JSON.stringify(leads));
+  console.log('[Mock API] Lead deleted from localStorage');
+
+  return { success: true };
 }
 
 export async function exportLeadData(leadId: string): Promise<Blob> {
