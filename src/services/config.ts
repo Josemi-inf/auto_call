@@ -2,6 +2,12 @@ export const API_BASE_URL = (import.meta as any).env?.VITE_API_BASE_URL || "";
 export const N8N_BASE_URL = (import.meta as any).env?.VITE_N8N_BASE_URL || "";
 export const N8N_API_KEY = (import.meta as any).env?.VITE_N8N_API_KEY || "";
 
+// n8n Webhook URLs
+export const WEBHOOK_GET_LEADS = (import.meta as any).env?.VITE_WEBHOOK_GET_LEADS || "";
+export const WEBHOOK_GET_LEAD_BY_ID = (import.meta as any).env?.VITE_WEBHOOK_GET_LEAD_BY_ID || "";
+export const WEBHOOK_UPDATE_LEAD = (import.meta as any).env?.VITE_WEBHOOK_UPDATE_LEAD || "";
+export const WEBHOOK_DELETE_LEAD = (import.meta as any).env?.VITE_WEBHOOK_DELETE_LEAD || "";
+
 // n8n Project and Folder IDs
 export const N8N_PROJECT_ID = (import.meta as any).env?.VITE_N8N_PROJECT_ID || "rxQ8hI6Swqb7nEbu";
 export const N8N_FOLDER_ID = (import.meta as any).env?.VITE_N8N_FOLDER_ID || "NVYJCuJItmlVruSj";
