@@ -49,21 +49,17 @@ async function maybeFetch<T>(path: string, init?: RequestInit, fallback?: T): Pr
 
 // Leads
 export async function getLeads(): Promise<Lead[]> {
-  // Use backend server API instead of webhooks
-  if (!API_BASE_URL) {
+  if (!WEBHOOK_GET_LEADS) {
     await delay(DEFAULT_DELAY_MS);
     // Try to get from localStorage first
     const cachedLeads = localStorage.getItem('mockLeads');
     const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
-    console.log('[Mock API] Using localStorage for getLeads - No API_BASE_URL configured');
+    console.log('[Mock API] Using localStorage for getLeads');
     return leads;
   }
 
   try {
-    const url = `${API_BASE_URL}/leads`;
-    console.log('[Backend API] Fetching leads from:', url);
-
-    const res = await fetch(url, {
+    const res = await fetch(WEBHOOK_GET_LEADS, {
       method: "GET",
       headers: { "Content-Type": "application/json" }
     });
@@ -71,32 +67,30 @@ export async function getLeads(): Promise<Lead[]> {
     if (!res.ok) throw new Error(`Get leads failed: ${res.status}`);
 
     const data = await res.json();
-    console.log('[Backend API] Leads fetched from PostgreSQL:', data);
+    console.log('[n8n API] Leads fetched from PostgreSQL:', data);
 
     // Handle both { data: [] } and [] formats
     return data.data || data;
   } catch (error) {
-    console.error('[Backend API] Error fetching leads:', error);
+    console.error('[n8n API] Error fetching leads:', error);
     throw error;
   }
 }
 
 export async function getLeadById(leadId: string): Promise<Lead> {
-  // Use backend server API instead of webhooks
-  if (!API_BASE_URL) {
+  if (!WEBHOOK_GET_LEAD_BY_ID) {
     await delay(DEFAULT_DELAY_MS);
     // Try to get from localStorage first
     const cachedLeads = localStorage.getItem('mockLeads');
     const leads = cachedLeads ? JSON.parse(cachedLeads) : mockLeads;
     const lead = leads.find((l: Lead) => l.lead_id === leadId) || leads[0];
-    console.log('[Mock API] Using localStorage for getLeadById - No API_BASE_URL configured');
+    console.log('[Mock API] Using localStorage for getLeadById');
     return lead;
   }
 
   try {
-    const url = `${API_BASE_URL}/leads/${leadId}`;
-    console.log('[Backend API] Fetching lead by ID from:', url);
-
+    // Try path parameter first (append leadId to webhook URL)
+    const url = `${WEBHOOK_GET_LEAD_BY_ID}/${leadId}`;
     const res = await fetch(url, {
       method: "GET",
       headers: { "Content-Type": "application/json" }
@@ -105,12 +99,12 @@ export async function getLeadById(leadId: string): Promise<Lead> {
     if (!res.ok) throw new Error(`Get lead by ID failed: ${res.status}`);
 
     const data = await res.json();
-    console.log('[Backend API] Lead fetched from PostgreSQL:', data);
+    console.log('[n8n API] Lead fetched from PostgreSQL:', data);
 
     // Handle both { data: {} } and {} formats
     return data.data || data;
   } catch (error) {
-    console.error('[Backend API] Error fetching lead by ID:', error);
+    console.error('[n8n API] Error fetching lead by ID:', error);
     throw error;
   }
 }
@@ -418,8 +412,7 @@ export async function getWeeklyLeadsData(): Promise<WeeklyLeadsData[]> {
 
 // Lead Management Functions
 export async function updateLead(leadId: string, data: Partial<Lead>): Promise<Lead> {
-  // Use backend server API instead of webhooks
-  if (!API_BASE_URL) {
+  if (!WEBHOOK_UPDATE_LEAD) {
     await delay(DEFAULT_DELAY_MS);
 
     // Get cached leads from localStorage
@@ -441,9 +434,8 @@ export async function updateLead(leadId: string, data: Partial<Lead>): Promise<L
   }
 
   try {
-    const url = `${API_BASE_URL}/leads/${leadId}`;
-    console.log('[Backend API] Updating lead at:', url);
-
+    // Send leadId in URL path and data in body
+    const url = `${WEBHOOK_UPDATE_LEAD}/${leadId}`;
     const res = await fetch(url, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -453,18 +445,17 @@ export async function updateLead(leadId: string, data: Partial<Lead>): Promise<L
     if (!res.ok) throw new Error(`Update lead failed: ${res.status}`);
 
     const result = await res.json();
-    console.log('[Backend API] Lead updated in PostgreSQL:', result);
+    console.log('[n8n API] Lead updated in PostgreSQL:', result);
 
     return result;
   } catch (error) {
-    console.error('[Backend API] Error updating lead:', error);
+    console.error('[n8n API] Error updating lead:', error);
     throw error;
   }
 }
 
 export async function deleteLead(leadId: string): Promise<{ success: boolean }> {
-  // Use backend server API instead of webhooks
-  if (!API_BASE_URL) {
+  if (!WEBHOOK_DELETE_LEAD) {
     await delay(DEFAULT_DELAY_MS);
 
     // Get cached leads from localStorage
@@ -476,15 +467,14 @@ export async function deleteLead(leadId: string): Promise<{ success: boolean }> 
 
     // Save to localStorage
     localStorage.setItem('mockLeads', JSON.stringify(leads));
-    console.log('[Mock API] Lead deleted from localStorage - No API_BASE_URL configured');
+    console.log('[Mock API] Lead deleted from localStorage');
 
     return { success: true };
   }
 
   try {
-    const url = `${API_BASE_URL}/leads/${leadId}`;
-    console.log('[Backend API] Deleting lead at:', url);
-
+    // Send leadId in URL path
+    const url = `${WEBHOOK_DELETE_LEAD}/${leadId}`;
     const res = await fetch(url, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" }
@@ -492,10 +482,10 @@ export async function deleteLead(leadId: string): Promise<{ success: boolean }> 
 
     if (!res.ok) throw new Error(`Delete lead failed: ${res.status}`);
 
-    console.log('[Backend API] Lead deleted from PostgreSQL');
+    console.log('[n8n API] Lead deleted from PostgreSQL');
     return { success: true };
   } catch (error) {
-    console.error('[Backend API] Error deleting lead:', error);
+    console.error('[n8n API] Error deleting lead:', error);
     throw error;
   }
 }
